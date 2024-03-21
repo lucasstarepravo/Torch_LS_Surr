@@ -92,7 +92,7 @@ class ANN:
                 outputs = self.model(inputs)  # Forward pass
                 loss = self.loss_function(outputs, labels)  # Calculate loss
                 loss.backward()  # Backward pass
-                self.optimizer.step()  # Update weights
+                self.optimizer.step()  # Update labels
 
                 running_loss += loss.item() * inputs.size(0)
 
@@ -106,12 +106,12 @@ class ANN:
             # Save the model if the validation loss improved
             if val_loss < best_val_loss:
                 best_val_loss = val_loss
-                best_model_wts = self.model.state_dict().copy()  # Deep copy the model weights
+                best_model_wts = self.model.state_dict().copy()  # Deep copy the model labels
 
             epoch_time = time.time() - epoch_start_time
             print(
-                f'Epoch {epoch + 1}/{self.epochs} - Loss: {avg_training_loss:.4f}, '
-                f'Validation Loss: {val_loss:.4f}, Time: {epoch_time:.2f}s')
+                f'Epoch {epoch + 1}/{self.epochs} - Loss: {avg_training_loss:.4e}, '
+                f'Validation Loss: {val_loss:.4e}, Time: {epoch_time:.2f}s')
 
         self.best_model_wts = best_model_wts
 
@@ -122,7 +122,7 @@ class ANN:
         self.training_loss = training_losses
         self.val_loss = validation_losses
 
-        # Load best model weights
+        # Load best model labels
         if self.best_model_wts is not None:
             self.model.load_state_dict(self.best_model_wts)
 

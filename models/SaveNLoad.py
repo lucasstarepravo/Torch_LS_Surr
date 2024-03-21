@@ -1,6 +1,6 @@
 import torch
-from learning_shapefunction.models.ANN import ANN_topology
-from learning_shapefunction.models.PINN import PINN_topology
+from models.ANN import ANN_topology
+from models.PINN import PINN_topology
 import pickle as pk
 
 

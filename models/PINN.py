@@ -56,35 +56,22 @@ def monomial_power_torch(polynomial):
     return torch.tensor(monomial_exponent, dtype=torch.int)
 
 
-def calc_moments_torch(neigh_xy_d, scaled_w, polynomial):
-    mon_power = monomial_power_torch(polynomial)
-    monomial = []
-    for power_x, power_y in mon_power:
-        monomial_term = (neigh_xy_d[:, :, 0] ** power_x * neigh_xy_d[:, :, 1] ** power_y) / \
-                        (math.factorial(power_x) * math.factorial(power_y))
-        monomial.append(monomial_term.unsqueeze(2))
-    moments = torch.cat(monomial, dim=2) * scaled_w.unsqueeze(2)
-    moments = torch.sum(moments, dim=1)
-    return moments
-
-
-def moments_normalised_torch(stand_feature, predicted_w, physics_loss, n):
-    stand_feature1 = stand_feature.view(stand_feature.shape[0], -1, n)
-
-    moments = calc_moments_torch(stand_feature1[:, :, :2], predicted_w, polynomial=physics_loss)
-    return moments
+def calc_moments_torch(stand_f, pred_l, n):
+    stand_f = stand_f.view(stand_f.shape[0], n, n)
+    pred_l = pred_l.unsqueeze(-1)
+    moments = torch.matmul(stand_f, pred_l)
+    return moments.squeeze(-1)
 
 
 def physics_loss_fn(outputs, inputs, physics_loss):
     n = int((physics_loss ** 2 + 3 * physics_loss) / 2)
-    moments = moments_normalised_torch(inputs, outputs, physics_loss, n)
+    moments = calc_moments_torch(inputs, outputs, n)
 
-
-    target_moments = torch.zeros((outputs.shape[0], n))
+    target_moments = torch.zeros((outputs.shape[0], n)) #make sure the outputs.shape[0] is capturing the dimension I want
     target_moments[:, 2] = 1
     target_moments[:, 4] = 1
     physics_loss = (target_moments - moments) ** 2
-    return physics_loss.mean()
+    return physics_loss.mean(axis=0)
 
 
 def define_loss(loss_function):
@@ -168,10 +155,11 @@ class PINN:
 
                 physics_loss = physics_loss_fn(outputs, inputs, self.moments)
 
-                total_loss = (1 - alpha) * loss + alpha * physics_loss
+                # Below I can implement different weights for the monomial physics loss
+                total_loss = (1 - alpha) * loss + alpha * physics_loss.mean()
 
                 total_loss.backward()  # Backward pass
-                self.optimizer.step()  # Update weights
+                self.optimizer.step()  # Update labels
 
                 running_loss += loss.item() * inputs.size(0)
 
@@ -185,7 +173,7 @@ class PINN:
             # Save the model if the validation loss improved
             if val_loss < best_val_loss:
                 best_val_loss = val_loss
-                best_model_wts = self.model.state_dict().copy()  # Deep copy the model weights
+                best_model_wts = self.model.state_dict().copy()  # Deep copy the model labels
 
             epoch_time = time.time() - epoch_start_time
             print(
@@ -201,7 +189,7 @@ class PINN:
         self.training_loss = training_losses
         self.val_loss = validation_losses
 
-        # Load best model weights
+        # Load best model labels
         if self.best_model_wts is not None:
             self.model.load_state_dict(self.best_model_wts)
 
