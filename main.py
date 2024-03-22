@@ -26,12 +26,17 @@ def import_stored_data(file, order, noise):
 
 
 # Define file details in a list of tuples (file_number, noise)
-file_details = [(6, 0.3)]
+file_details = [(7, 0.3)]
 
 # Initialize empty lists to store processed data
 amat_list = []
 psi_list = []
+
+# derivative will be used to standardize and rescale psi
 derivative = 'Laplace'
+
+# polynomial will be used to determine which file to import, also for the physics loss function of the PINN,
+# and to calculate the moments of the predicted and actual psi
 polynomial = 2
 
 for file_number, noise in file_details:
@@ -64,16 +69,26 @@ train_labels = torch.tensor(train_l, dtype=torch.float32)
 val_features = torch.tensor(val_f, dtype=torch.float32)
 val_labels = torch.tensor(val_l, dtype=torch.float32)
 
-ann = PINN([64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64], optimizer='adam',
-            loss_function='MSE', epochs=10, batch_size=64, train_f=train_features,
+
+pinn2 = PINN([64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64],
+            optimizer='adam',
+            loss_function='MSE', epochs=1000, batch_size=64, train_f=train_features,
+            train_l=train_labels, val_f=val_features, val_l=val_labels, moments=polynomial, final_alpha=1)
+pinn2.fit()
+
+pinn1 = PINN([64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64],
+            optimizer='adam',
+            loss_function='MSE', epochs=1000, batch_size=64, train_f=train_features,
             train_l=train_labels, val_f=val_features, val_l=val_labels, moments=polynomial, final_alpha=0.4)
+pinn1.fit()
 
-#ann = ANN([256, 256, 256], optimizer='adam', loss_function='MSE',
-#          epochs=1, batch_size=64, train_f=train_features, train_l=train_labels, val_f=val_features, val_l=val_labels)
 
-#gp = GP(train_x=train_features, train_y=train_labels)
+ann = ANN([64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64], optimizer='adam', loss_function='MSE',
+          epochs=1000, batch_size=64, train_f=train_features, train_l=train_labels, val_f=val_features, val_l=val_labels)
 
 ann.fit()
+
+#gp = GP(train_x=train_features, train_y=train_labels)
 
 # To save a model
 # Here the file path should be the directory which the history and model labels should be saved
@@ -92,9 +107,9 @@ plot_training_pytorch(ann)
 test_features = torch.tensor(test_f, dtype=torch.float32)
 pred_l = ann.predict(test_features)
 
-scaled_psi_pred, scaled_psi_act = rescale_psi(pred_l, test_l, h, derivative) # Right now h can only rescale 1 resolution at a time
-moments_act = calc_moments(test_f, scaled_psi_act, polynomial=polynomial)
-moments_pred = calc_moments(test_f, scaled_psi_pred.numpy(), polynomial=polynomial)
+#scaled_psi_pred, scaled_psi_act = rescale_psi(pred_l, test_l, h, derivative) # Right now h can only rescale 1 resolution at a time
+moments_act = calc_moments(test_f, test_l, polynomial=polynomial)
+moments_pred = calc_moments(test_f, pred_l.numpy(), polynomial=polynomial)
 moment_error = np.mean(abs(moments_pred - moments_act), axis=0)
 moment_std = np.std(abs(moments_pred - moments_act), axis=0)
 
