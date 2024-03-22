@@ -177,8 +177,8 @@ class PINN:
 
             epoch_time = time.time() - epoch_start_time
             print(
-                f'Epoch {epoch + 1}/{self.epochs} - Loss: {avg_training_loss:.4f}, '
-                f'Validation Loss: {val_loss:.4f}, Time: {epoch_time:.2f}s')
+                f'Epoch {epoch + 1}/{self.epochs} - Loss: {avg_training_loss:.4e}, '
+                f'Validation Loss: {val_loss:.4e}, Time: {epoch_time:.2f}s')
 
         self.best_model_wts = best_model_wts
 
