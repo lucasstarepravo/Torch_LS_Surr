@@ -12,6 +12,7 @@ class ResNet_topology(nn.Module):
     def __init__(self, input_size, output_size, hidden_layers, skip_connections):
         super(ResNet_topology, self).__init__()
         self.skip_connections = skip_connections if skip_connections else []
+        self.scaled_skip_connection = [(x * 2 + 1, y * 2 + 1) for x, y in skip_connections]
 
         layers = [nn.Linear(input_size, hidden_layers[0])]
         layers += [nn.SiLU()]
@@ -27,19 +28,22 @@ class ResNet_topology(nn.Module):
         self.layers = nn.ModuleList(layers)
 
     def forward(self, x):
-        skip_input = x  # Preserve the original input for skip connections
+        resblock_output = {}
 
         for i, layer in enumerate(self.layers):
-            # Check if this layer is designated to receive a skip connection
-            if i in self.skip_connections:
-                # Ensure dimensionality matches, adjust if necessary
-                if skip_input.shape[1] != x.shape[1]:
-                    # Example adjustment: simple linear transformation to match sizes
-                    # This requires defining additional nn.Linear modules for each skip connection
-                    skip_input = self.adjust_dimensions[i](skip_input)
-                x += skip_input  # Add the skip connection
 
-            x = layer(x)
+            res_block = [(index, tup) for index, tup in enumerate(self.scaled_skip_connection) if i in tup] # This checks if the current layer is supposed to be a residual block
+# For now, this code only works with unique receiving and sending block layers (a layer cannot receive to past outputs, or receive and send the output through the same layer)
+            if res_block:
+                if i == res_block[0][1][0]:  # This checks if this is the start or finish of residual block
+                    x = layer(x)
+                    resblock_output[res_block[0][1][1]] = x
+                else:
+                    x = layer(x)
+                    x = x + resblock_output[i]
+
+            else:
+                x = layer(x)
 
         return x
 
