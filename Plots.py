@@ -14,7 +14,7 @@ def plot_training_pytorch(history):
 
     # Plot the training and validation loss
     plt.plot(epochs, training_losses, 'b', label='Training Loss')
-    plt.plot(epochs, validation_losses, 'r', label='Validation Loss')
+    plt.plot(epochs, validation_losses, 'r', label='Validation Loss', alpha=0.5)
     plt.title('Training and Validation Loss')
     plt.xlabel('Epochs')
 
