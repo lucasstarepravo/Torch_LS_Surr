@@ -1,7 +1,4 @@
 import numpy as np
-from scipy.optimize import minimize
-from data_processing.postprocessing import monomial_power
-import math
 
 
 def standardize_psi(psi,h, derivative):
