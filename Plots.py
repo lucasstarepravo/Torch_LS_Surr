@@ -2,7 +2,8 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 
-def plot_training_pytorch(history, window_size=10, plot_original=False, save=False, show_legend=True, log_y=False):
+def plot_training_pytorch(history, window_size=10, plot_original=False, save=False, show_legend=True, log_y=False,
+                          title=False, plot_smooth=False):
     plt.style.use('seaborn-v0_8-paper')
 
     try:
@@ -32,9 +33,13 @@ def plot_training_pytorch(history, window_size=10, plot_original=False, save=Fal
         ax.plot(epochs, validation_losses, linestyle='-', color='r', alpha=0.5, label='Validation Loss (Original)')
 
     # Plot the smoothed validation loss
-    ax.plot(epochs, smoothed_validation_losses, linestyle='-', color='g', alpha=0.5, label='Validation Loss (Smoothed)', linewidth=2)
+    if plot_smooth:
+        ax.plot(epochs, smoothed_validation_losses, linestyle='-', color='g', alpha=0.5, label='Validation Loss (Smoothed)', linewidth=2)
 
-    plt.title('Training and Validation Loss', fontsize=16, family='serif')
+    if title==False:
+        plt.title('Training and Validation Loss', fontsize=16, family='serif')
+    else:
+        plt.title(title, fontsize=16, family='serif')
     plt.xlabel('Epochs', fontsize=16, family='serif')
     plt.ylabel('Loss (MSE)', fontsize=16, family='serif')
 
