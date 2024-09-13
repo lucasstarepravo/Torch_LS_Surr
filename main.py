@@ -11,112 +11,137 @@ from models.ResNet import ResNet
 from models.SaveNLoad import *
 import numpy as np
 import pickle as pk
+import os
+import logging
+
+# Set up logging
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+logger = logging.getLogger(__name__)
 
 
-def import_stored_data(file, order, noise):
-    amat = '/home/combustion/Desktop/PhD/Shape Function Surrogate/Order_' + str(order) + '/Noise_' + str(
-        noise) + '/Data/amat/amat_' \
-           + str(file) + '.csv'
-    psi = '/home/combustion/Desktop/PhD/Shape Function Surrogate/Order_' + str(order) + '/Noise_' + str(
-        noise) + '/Data/psi/laplace/psi_' \
-          + str(file) + '.csv'
-    h = '/home/combustion/Desktop/PhD/Shape Function Surrogate/Order_' + str(order) + '/Noise_' + str(
-        noise) + '/Data/h/h' \
-         + str(file) + '.csv'
+def import_stored_data(base_path, file, order, noise):
+    order_noise_path = os.path.join(base_path, f'Order_{order}', f'Noise_{noise}', 'Data')
 
-    amat = np.genfromtxt(amat, delimiter=',', skip_header=0)
-    psi = np.genfromtxt(psi, delimiter=',', skip_header=0)
-    h = np.genfromtxt(h, delimiter=',', skip_header=0)
-    return amat, psi, h[:-1]  # the coefficient multiplying dx comes from Fortran hovdx variable
+    amat_path = os.path.join(order_noise_path, 'amat', f'amat_{file}.csv')
+    psi_path = os.path.join(order_noise_path, 'psi', 'laplace', f'psi_{file}.csv')
+    h_path = os.path.join(order_noise_path, 'h', f'h{file}.csv')
+
+    amat = np.genfromtxt(amat_path, delimiter=',', skip_header=0)
+    psi = np.genfromtxt(psi_path, delimiter=',', skip_header=0)
+    h = np.genfromtxt(h_path, delimiter=',', skip_header=0)
+
+    return amat, psi, h[:-1]  # Remove last element for Fortran hovdx variable
 
 
-# Define file details in a list of tuples (file_number, noise)
-file_details = [(6, 0.3)]
+def run_model(path_to_data, layers, ID, path_to_save='./data_out'):
+    logger.info(f'Running model with layers: {layers} and ID: {ID}')
 
-# Initialize empty lists to store processed data
-amat_list = []
-psi_list = []
+    # Define file details in a list of tuples (file_number, noise)
+    file_details = [(6, 0.3)]
 
-# derivative will be used to standardize and rescale psi
-derivative = 'Laplace'
+    # Initialize empty lists to store processed data
+    amat_list = []
+    psi_list = []
 
-# polynomial will be used to determine which file to import, also for the physics loss function of the PINN,
-# and to calculate the moments of the predicted and actual psi
-polynomial = 2
+    # Derivative and polynomial details
+    derivative = 'Laplace'
+    polynomial = 2
 
-for file_number, noise in file_details:
-    # Import data
-    amat, psi, h = import_stored_data(file_number, order=polynomial, noise=noise)
+    # Loop through file details to import and process data
+    for file_number, noise in file_details:
+        logger.info(f'Processing file number: {file_number}, noise: {noise}')
 
-    stand_psi = standardize_psi(psi, h, derivative)
+        # Import data
+        amat, psi, h = import_stored_data(path_to_data, file_number, order=polynomial, noise=noise)
 
-    # Append processed data to lists
-    amat_list.append(amat)
-    psi_list.append(stand_psi)
+        # Standardize psi data
+        stand_psi = standardize_psi(psi, h, derivative)
 
-# Concatenate lists to form final datasets
-stand_feature = np.concatenate(amat_list, axis=0)
-stand_label = np.concatenate(psi_list, axis=0)
+        # Append processed data to lists
+        amat_list.append(amat)
+        psi_list.append(stand_psi)
 
-train_f, train_l, test_f, test_l, train_index, test_index = create_train_test(stand_feature, stand_label,
-                                                                              tt_split=0.9,
-                                                                              seed=1)  # This generates the test data
+    # Concatenate lists to form final datasets
+    stand_feature = np.concatenate(amat_list, axis=0)
+    stand_label = np.concatenate(psi_list, axis=0)
 
-train_f, val_f, train_l, val_l = train_test_split(train_f, train_l, test_size=0.2,
-                                                  random_state=1)  # This generates the validation data
+    # Split data into training and test sets
+    train_f, train_l, test_f, test_l, train_index, test_index = create_train_test(stand_feature, stand_label,
+                                                                                  tt_split=0.9, seed=1)
+    train_f, val_f, train_l, val_l = train_test_split(train_f, train_l, test_size=0.2, random_state=1)
 
-N = train_l.shape[1]
+    # Convert data to PyTorch tensors
+    train_features = torch.tensor(train_f, dtype=torch.float32)
+    train_labels = torch.tensor(train_l, dtype=torch.float32)
+    val_features = torch.tensor(val_f, dtype=torch.float32)
+    val_labels = torch.tensor(val_l, dtype=torch.float32)
 
-# Converting data to PyTorch tensors
-train_features = torch.tensor(train_f, dtype=torch.float32)
-train_labels = torch.tensor(train_l, dtype=torch.float32)
-val_features = torch.tensor(val_f, dtype=torch.float32)
-val_labels = torch.tensor(val_l, dtype=torch.float32)
+    ann = PINN(layers,
+                 optimizer='adam',
+                 loss_function='MSE', epochs=1000, batch_size=64, train_f=train_features,
+                 train_l=train_labels, val_f=val_features, val_l=val_labels, moments=polynomial, final_alpha=0.3)
+    ann.fit()
 
-#pinn1 = PINN([64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64],
-#             optimizer='adam',
-#             loss_function='MSE', epochs=1000, batch_size=64, train_f=train_features,
-#             train_l=train_labels, val_f=val_features, val_l=val_labels, moments=polynomial, final_alpha=0.3)
-#pinn1.fit()
-
-#ann = ANN([64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64], optimizer='adam', loss_function='MSE',
-#          epochs=1500, batch_size=64, train_f=train_features, train_l=train_labels, val_f=val_features,
-#          val_l=val_labels)
-hidden_layers = 100 * [32]
-
-res2 = ResNet(hidden_layers, optimizer='adam',
-             loss_function='MSE', epochs=2500, batch_size=128, train_f=train_features, train_l=train_labels,
-             val_f=val_features, val_l=val_labels, skip_connections=[(0, 99), (1, 19), (20, 39), (40, 59), (60, 79), (80, 98)])
-
-pinn_res2 = PINN_ResNet(hidden_layers,
-                       optimizer='adam', loss_function='sgs', epochs=3000, batch_size=128, train_f=train_features,
-                       train_l=train_labels, val_f=val_features, val_l=val_labels,
-                       skip_connections=[(0, 99), (1, 19), (20, 39), (40, 59), (60, 79), (80, 98)], moments=polynomial,
-                       final_alpha=0.5, alpha_epoch_start=1000)
-
-ann.fit()
-
-# gp = GP(train_x=train_features, train_y=train_labels)
-
-# To save a model
-# Here the file path should be the directory which the history and model labels should be saved
-# save_model_instance(ann, 'file path', 'ann or pinn', 'model_ID')
+    # ann = ANN(layers, optimizer='adam', loss_function='MSE',
+    #          epochs=1500, batch_size=64, train_f=train_features, train_l=train_labels, val_f=val_features,
+    #          val_l=val_labels)
 
 
-# To load a model
-# Here the file path should be the exact path to the file and should contain the file in the end of the directory
-# Notice that the file path to model and attrs will contain different files in the end
-# attrs = load_attrs('file_path') # Recall to add attrs#.pk at the end of the path
-# model = load_model_instance('file_path', attrs)
+    # res2 = ResNet(layers, optimizer='adam',
+    #              loss_function='MSE', epochs=2500, batch_size=128, train_f=train_features, train_l=train_labels,
+    #              val_f=val_features, val_l=val_labels, skip_connections=[(0, 99), (1, 19), (20, 39), (40, 59),
+    #              (60, 79), (80, 98)])
+
+    # pinn_res2 = PINN_ResNet(layers,
+    #                       optimizer='adam', loss_function='sgs', epochs=3000, batch_size=128, train_f=train_features,
+    #                       train_l=train_labels, val_f=val_features, val_l=val_labels,
+    #                       skip_connections=[(0, 99), (1, 19), (20, 39), (40, 59), (60, 79), (80, 98)],
+    #                       moments=polynomial, final_alpha=0.5, alpha_epoch_start=1000)
+
+    # Initialize and train model
+    #ann = ANN(layers, optimizer='adam', loss_function='MSE', epochs=1500, batch_size=64,
+    #          train_f=train_features, train_l=train_labels, val_f=val_features, val_l=val_labels)
 
 
-plot_training_pytorch(ann)
 
-test_features = torch.tensor(test_f, dtype=torch.float32)
-pred_l = ann.predict(test_features)
+    logger.info('Starting model training')
+    ann.fit()
 
-# scaled_psi_pred, scaled_psi_act = rescale_psi(pred_l, test_l, h, derivative) # Right now h can only rescale 1 resolution at a time
-moments_act = calc_moments(test_f, test_l, polynomial=polynomial)
-moments_pred = calc_moments(test_f, pred_l.detach().numpy(), polynomial=polynomial)
-moment_error = np.mean(abs(moments_pred - moments_act), axis=0)
-moment_std = np.std(abs(moments_pred - moments_act), axis=0)
+    # Save the model
+    save_model_instance(ann, path_to_save, 'ann', ID)
+
+    # Predict on test data
+    test_features = torch.tensor(test_f, dtype=torch.float32)
+    pred_l = ann.predict(test_features)
+
+    # Calculate moments and moment errors
+    moments_act = calc_moments(test_f, test_l, polynomial=polynomial)
+    moments_pred = calc_moments(test_f, pred_l.detach().numpy(), polynomial=polynomial)
+    moment_error = np.mean(abs(moments_pred - moments_act), axis=0)
+    moment_std = np.std(abs(moments_pred - moments_act), axis=0)
+
+    # Save variables
+    save_variable_with_pickle(moment_error, "moment_error", ID, path_to_save)
+    save_variable_with_pickle(moment_std, "moment_std", ID, path_to_save)
+
+    logger.info('Model run complete')
+
+
+def save_variable_with_pickle(variable, variable_name, variable_id, filepath):
+    # Ensure the directory exists
+    if not os.path.exists(filepath):
+        os.makedirs(filepath)
+
+    # Construct the filename with the ID appended
+    file_name = f"{variable_name}{variable_id}.pk"
+    file_path = os.path.join(filepath, file_name)
+
+    # Save the variable using pickle
+    with open(file_path, 'wb') as f:
+        pk.dump(variable, f)
+        logger.info(f"Variable saved as '{file_path}'.")
+
+
+if __name__ == '__main__':
+    run_model('/home/combustion/Desktop/PhD/Shape Function Surrogate', 100 * [32], ID='49', path_to_save='./data_out')
+
