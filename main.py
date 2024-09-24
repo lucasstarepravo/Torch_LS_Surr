@@ -20,7 +20,7 @@ logger = logging.getLogger(__name__)
 
 
 def import_stored_data(base_path, file, order, noise):
-    order_noise_path = os.path.join(base_path, f'Order_{order}', f'Noise_{noise}', 'Data')
+    order_noise_path = base_path
 
     amat_path = os.path.join(order_noise_path, 'amat', f'amat_{file}.csv')
     psi_path = os.path.join(order_noise_path, 'psi', 'laplace', f'psi_{file}.csv')
@@ -143,5 +143,5 @@ def save_variable_with_pickle(variable, variable_name, variable_id, filepath):
 
 
 if __name__ == '__main__':
-    run_model('/home/combustion/Desktop/PhD/Shape Function Surrogate', 100 * [32], ID='49', path_to_save='./data_out')
+    run_model('/mnt/iusers01/mace01/w32040lg/mfree_surr/data/Order_2/Noise_0.3/Data', 100 * [32], ID='49', path_to_save='./data_out')
 
