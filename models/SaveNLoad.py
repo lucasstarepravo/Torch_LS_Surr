@@ -9,9 +9,9 @@ def save_model_instance(ann_instance, filepath, model_type, model_ID):
     # Ensure the directory exists
     os.makedirs(filepath, exist_ok=True)
 
-    # Save the PyTorch model's state dict
+    # Save the PyTorch model's state dict from the `model` attribute
     model_path = os.path.join(filepath, f'{model_type}{model_ID}.pth')
-    torch.save(ann_instance.state_dict(), model_path)
+    torch.save(ann_instance.model.state_dict(), model_path)  # Access the internal `model` attribute
 
     # Prepare attributes to save
     attrs = {
