@@ -143,5 +143,5 @@ def save_variable_with_pickle(variable, variable_name, variable_id, filepath):
 
 
 if __name__ == '__main__':
-    run_model('/Volumes/External_HD/PhD/LABFM_Surr', [32], ID='49', path_to_save='./data_out')
+    run_model('/mnt/iusers01/mace01/w32040lg/mfree_surr/data/Order_2/Noise_0.3/Data', 100 * [32], ID='49', path_to_save='./data_out')
 
