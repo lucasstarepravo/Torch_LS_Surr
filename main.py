@@ -76,10 +76,10 @@ def run_model(path_to_data, layers, ID, path_to_save='./data_out'):
     val_features = torch.tensor(val_f, dtype=torch.float32)
     val_labels = torch.tensor(val_l, dtype=torch.float32)
 
-    ann = PINN(layers,
-                 optimizer='adam',
-                 loss_function='MSE', epochs=1000, batch_size=64, train_f=train_features,
-                 train_l=train_labels, val_f=val_features, val_l=val_labels, moments=polynomial, final_alpha=0.3)
+    #ann = PINN(layers,
+    #             optimizer='adam',
+    #             loss_function='MSE', epochs=5000, batch_size=64, train_f=train_features,
+    #             train_l=train_labels, val_f=val_features, val_l=val_labels, moments=polynomial, final_alpha=0.5)
     ann.fit()
 
     # ann = ANN(layers, optimizer='adam', loss_function='MSE',
@@ -87,10 +87,10 @@ def run_model(path_to_data, layers, ID, path_to_save='./data_out'):
     #          val_l=val_labels)
 
 
-    # res2 = ResNet(layers, optimizer='adam',
-    #              loss_function='MSE', epochs=2500, batch_size=128, train_f=train_features, train_l=train_labels,
-    #              val_f=val_features, val_l=val_labels, skip_connections=[(0, 99), (1, 19), (20, 39), (40, 59),
-    #              (60, 79), (80, 98)])
+    ann = ResNet(layers, optimizer='adam',
+                  loss_function='MSE', epochs=1000, batch_size=64, train_f=train_features, train_l=train_labels,
+                  val_f=val_features, val_l=val_labels, skip_connections=[(0, 99), (1, 19), (20, 39), (40, 59),
+                  (60, 79), (80, 98)])
 
     # pinn_res2 = PINN_ResNet(layers,
     #                       optimizer='adam', loss_function='sgs', epochs=3000, batch_size=128, train_f=train_features,
@@ -108,7 +108,7 @@ def run_model(path_to_data, layers, ID, path_to_save='./data_out'):
     ann.fit()
 
     # Save the model
-    save_model_instance(ann, path_to_save, 'ann', ID)
+    save_model_instance(ann, path_to_save, 'res', ID)
 
     # Predict on test data
     test_features = torch.tensor(test_f, dtype=torch.float32)
@@ -143,5 +143,5 @@ def save_variable_with_pickle(variable, variable_name, variable_id, filepath):
 
 
 if __name__ == '__main__':
-    run_model('/mnt/iusers01/mace01/w32040lg/mfree_surr/data/Order_2/Noise_0.3/Data', 100 * [32], ID='49', path_to_save='./data_out')
+    run_model('/mnt/iusers01/mace01/w32040lg/mfree_surr/data/Order_2/Noise_0.3/Data', 100*[32], ID='54', path_to_save='./data_out')
 
