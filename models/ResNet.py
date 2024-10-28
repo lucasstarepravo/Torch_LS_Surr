@@ -15,11 +15,13 @@ class ResNet_topology(nn.Module):
         self.scaled_skip_connection = [(x * 2 + 1, y * 2 + 1) for x, y in skip_connections]
 
         layers = [nn.Linear(input_size, hidden_layers[0])]
-        layers += [nn.Tanh()]
+        layers += [nn.LayerNorm(hidden_layers[0])]
+        layers += [nn.SiLU()]
 
         for i in range(1, len(hidden_layers)):
             layers.append(nn.Linear(hidden_layers[i - 1], hidden_layers[i]))
-            layers.append(nn.Tanh())
+            layers.append(nn.LayerNorm(hidden_layers[i]))
+            layers.append(nn.SiLU())
 
         # Add the final layer
         layers.append(nn.Linear(hidden_layers[-1], output_size))

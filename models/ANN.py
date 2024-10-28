@@ -12,10 +12,12 @@ class ANN_topology(nn.Module):
     def __init__(self, input_size, output_size, hidden_layers):
         super(ANN_topology, self).__init__()
         layers = [nn.Linear(input_size, hidden_layers[0])]
+        layers += [nn.LayerNorm(hidden_layers[0])]
         layers += [nn.SiLU()]
 
         for i in range(1, len(hidden_layers)):
             layers.append(nn.Linear(hidden_layers[i - 1], hidden_layers[i]))
+            layers.append(nn.LayerNorm(hidden_layers[i]))
             layers.append(nn.SiLU())
 
         # Add the final layer
