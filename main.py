@@ -37,7 +37,7 @@ def run_model(path_to_data, layers, ID, path_to_save='./data_out'):
     logger.info(f'Running model with layers: {layers} and ID: {ID}')
 
     # Define file details in a list of tuples (file_number, noise)
-    file_details = [(6, 0.3)]
+    file_details = [(7, 0.3)]
 
     # Initialize empty lists to store processed data
     amat_list = []
@@ -76,21 +76,21 @@ def run_model(path_to_data, layers, ID, path_to_save='./data_out'):
     val_features = torch.tensor(val_f, dtype=torch.float32)
     val_labels = torch.tensor(val_l, dtype=torch.float32)
 
-    #ann = PINN(layers,
-    #             optimizer='adam',
-    #             loss_function='MSE', epochs=5000, batch_size=64, train_f=train_features,
-    #             train_l=train_labels, val_f=val_features, val_l=val_labels, moments=polynomial, final_alpha=0.5)
-    ann.fit()
+    ann = PINN(layers,
+                 optimizer='adam',
+                 loss_function='MSE', epochs=50000, batch_size=64, train_f=train_features,
+                 train_l=train_labels, val_f=val_features, val_l=val_labels, moments=polynomial, final_alpha=0.5)
+    #ann.fit()
 
-    # ann = ANN(layers, optimizer='adam', loss_function='MSE',
-    #          epochs=1500, batch_size=64, train_f=train_features, train_l=train_labels, val_f=val_features,
+    
+    #ann = ANN(layers, optimizer='adam', loss_function='MSE',
+    #          epochs=50000, batch_size=64, train_f=train_features, train_l=train_labels, val_f=val_features,
     #          val_l=val_labels)
 
 
-    ann = ResNet(layers, optimizer='adam',
-                  loss_function='MSE', epochs=1000, batch_size=64, train_f=train_features, train_l=train_labels,
-                  val_f=val_features, val_l=val_labels, skip_connections=[(0, 99), (1, 19), (20, 39), (40, 59),
-                  (60, 79), (80, 98)])
+    #ann = ResNet(layers, optimizer='adam',
+    #              loss_function='MSE', epochs=50000, batch_size=64, train_f=train_features, train_l=train_labels,
+    #              val_f=val_features, val_l=val_labels, skip_connections=[(0, 6)])
 
     # pinn_res2 = PINN_ResNet(layers,
     #                       optimizer='adam', loss_function='sgs', epochs=3000, batch_size=128, train_f=train_features,
@@ -108,11 +108,12 @@ def run_model(path_to_data, layers, ID, path_to_save='./data_out'):
     ann.fit()
 
     # Save the model
-    save_model_instance(ann, path_to_save, 'res', ID)
+    save_model_instance(ann, path_to_save, 'pinn', ID)
 
     # Predict on test data
     test_features = torch.tensor(test_f, dtype=torch.float32)
     pred_l = ann.predict(test_features)
+
 
     # Calculate moments and moment errors
     moments_act = calc_moments(test_f, test_l, polynomial=polynomial)
@@ -143,5 +144,5 @@ def save_variable_with_pickle(variable, variable_name, variable_id, filepath):
 
 
 if __name__ == '__main__':
-    run_model('/mnt/iusers01/mace01/w32040lg/mfree_surr/data/Order_2/Noise_0.3/Data', 100*[32], ID='54', path_to_save='./data_out')
+    run_model('/mnt/iusers01/mace01/w32040lg/mfree_surr/data/Order_2/Noise_0.3/Data', 7*[64], ID='63', path_to_save='./data_out')
 
