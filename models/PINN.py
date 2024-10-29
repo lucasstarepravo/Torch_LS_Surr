@@ -1,13 +1,17 @@
-import numpy as np
-import torch
-import torch.nn as nn
-import torch.optim as optim
 from torch.utils.data import DataLoader, TensorDataset
 import torch
 import torch.nn as nn
 import time
 from tqdm import tqdm
-import math
+from torch.distributed import init_process_group
+
+import torch.distributed.autograd as dist_autograd
+from torch.nn.parallel import DistributedDataParallel as DDP
+import torch.distributed as dist
+import torch.multiprocessing as mp
+from torch import optim
+from torch.distributed.optim import DistributedOptimizer
+from torch.distributed.rpc import RRef
 
 
 class PINN_topology(nn.Module):
@@ -88,20 +92,23 @@ class PINN:
                  train_l, val_f, val_l, moments, dynamic_physics_loss=False,
                  alpha_epoch_start=0, alpha_epoch_stop=None, final_alpha=0.5):
         '''alpha_epoch_stop must be bigger than alpha_epoch_start'''
+        self.train_loader = None
+        self.val_loader = None
+        self.optimizer = None
         self.input_size = train_f.shape[1]
         self.output_size = train_l.shape[1]
         self.hidden_layers = hidden_layers
-        self.model = PINN_topology(self.input_size, self.output_size, hidden_layers)
+        self.optim_choice = optimizer
 
-        if optimizer == 'adam':
-            self.optimizer = torch.optim.Adam(self.model.parameters())
 
         self.loss_function = define_loss(loss_function)
         self.epochs = epochs
-        self.train_loader = DataLoader(TensorDataset(train_f, train_l), batch_size=batch_size,
-                                       shuffle=True)
-        self.val_loader = DataLoader(TensorDataset(val_f, val_l), batch_size=batch_size,
-                                     shuffle=False)
+        self.train_f = train_f
+        self.train_l = train_l
+        self.val_f = val_f
+        self.val_l = val_l
+
+
         self.best_model_wts = None
         self.training_loss = None
         self.val_loss = None
@@ -125,7 +132,45 @@ class PINN:
             # If alpha is not given a value, it will be only finished incremented in the last epoch
             self.alpha_epoch_stop = epochs
 
-    def fit(self):
+    def fit(self, proc_index, nprocs):
+
+        # Initialising backend
+        # If want to use GPU, use nccl backend
+        init_process_group(backend='gloo', world_size=nprocs, rank=proc_index)
+
+        # Enumerating process -- Only necessary for GPU
+        #torch.cuda.set_device(proc_index)
+
+        # Preparing data
+        train_tensor = TensorDataset(self.train_f, self.train_l)
+        tr_sampler = torch.utils.data.distributed.DistributedSampler(train_tensor,
+                                                                     num_replicas=nprocs, rank=proc_index)
+        self.train_loader = torch.utils.data.DataLoader(train_tensor,
+                                                        batch_size=self.batch_size, sampler=tr_sampler)
+
+        val_tensor = TensorDataset(self.val_f, self.val_l)
+        val_sampler = torch.utils.data.distributed.DistributedSampler(val_tensor,
+                                                                     num_replicas=nprocs, rank=proc_index)
+        self.val_loader = torch.utils.data.DataLoader(val_tensor,
+                                                      batch_size=self.batch_size, sampler=val_sampler)
+
+        #self.train_loader = DataLoader(TensorDataset(train_f, train_l), batch_size=batch_size,
+        #                               shuffle=True)
+        #self.val_loader = DataLoader(TensorDataset(val_f, val_l), batch_size=batch_size,
+        #                             shuffle=False)
+
+        # Initialising model -- append the end if using GPU
+        self.model = PINN_topology(self.input_size, self.output_size, self.hidden_layers)#.to(proc_index)
+
+        # Optimiser
+        if self.optim_choice == 'adam':
+            self.optimizer = torch.optim.Adam(self.model.parameters())
+
+
+        model_ddp = DDP(self.model)
+        # For GPU
+        #model_ddp = DDP(self.model, device_ids=[proc_index])
+
         best_val_loss = float('inf')
         best_model_wts = None
 
@@ -143,7 +188,7 @@ class PINN:
         for epoch in range(self.epochs):
             epoch_start_time = time.time()
 
-            self.model.train()  # Set model to training mode
+            model_ddp.train()  # Set model to training mode
             running_loss = 0.0
 
             if self.dynamic_physics_loss:
@@ -152,7 +197,7 @@ class PINN:
 
             for inputs, labels in self.train_loader:
                 self.optimizer.zero_grad()  # Clear previous gradients
-                outputs = self.model(inputs)  # Forward pass
+                outputs = model_ddp(inputs)  # Forward pass
                 loss = self.loss_function(outputs, labels)  # Calculate loss
 
                 physics_loss = physics_loss_fn(outputs, inputs, self.moments)
@@ -169,13 +214,17 @@ class PINN:
             training_losses.append(avg_training_loss)
 
             # Calculate validation loss after each epoch
-            val_loss = calculate_val_loss(self.model, self.val_loader, self.loss_function)
+            val_loss = calculate_val_loss(model_ddp, self.val_loader, self.loss_function)
             validation_losses.append(val_loss)
+
+            # If want to free up GPU and calc loss on CPU transfer the operation to the CPU
+            #val_loss = calculate_val_loss(model_ddp.to('cpu'), self.val_loader, self.loss_function)
+            #model_ddp.to(proc_index)
 
             # Save the model if the validation loss improved
             if val_loss < best_val_loss:
                 best_val_loss = val_loss
-                best_model_wts = self.model.state_dict().copy()  # Deep copy the model labels
+                best_model_wts = model_ddp.state_dict().copy()  # Deep copy the model labels
 
             epoch_time = time.time() - epoch_start_time
             print(
@@ -192,8 +241,10 @@ class PINN:
         self.val_loss = validation_losses
 
         # Load best model labels
-        if self.best_model_wts is not None:
-            self.model.load_state_dict(self.best_model_wts)
+        if proc_index == 0 and self.best_model_wts is not None:
+            self.model = model_ddp.load_state_dict(self.best_model_wts)
+
+        dist.destroy_process_group()
 
     def predict(self, input):
         self.model.eval()
