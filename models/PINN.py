@@ -159,10 +159,7 @@ class PINN:
         self.val_loader = torch.utils.data.DataLoader(val_tensor,
                                                       batch_size=self.batch_size, sampler=val_sampler, num_workers=4)
 
-        #self.train_loader = DataLoader(TensorDataset(train_f, train_l), batch_size=batch_size,
-        #                               shuffle=True)
-        #self.val_loader = DataLoader(TensorDataset(val_f, val_l), batch_size=batch_size,
-        #                             shuffle=False)
+
         logger.debug('Initialising model')
         # Initialising model -- append the end if using GPU
         self.model = PINN_topology(self.input_size, self.output_size, self.hidden_layers)#.to(proc_index)
