@@ -140,10 +140,10 @@ class PINN:
         logger.debug('Importing backend')
         # Initialising backend
         # If want to use GPU, use nccl backend
-        init_process_group(backend='gloo', world_size=nprocs, rank=proc_index)
+        init_process_group(backend='nccl', world_size=nprocs, rank=proc_index)
 
         # Enumerating process -- Only necessary for GPU
-        #torch.cuda.set_device(proc_index)
+        torch.cuda.set_device(proc_index)
 
         logger.debug('Formating data')
         # Preparing data
@@ -165,7 +165,7 @@ class PINN:
         #                             shuffle=False)
         logger.debug('Initialising model')
         # Initialising model -- append the end if using GPU
-        self.model = PINN_topology(self.input_size, self.output_size, self.hidden_layers)#.to(proc_index)
+        self.model = PINN_topology(self.input_size, self.output_size, self.hidden_layers).to(proc_index)
 
         # Optimiser
         if self.optim_choice == 'adam':
@@ -175,10 +175,10 @@ class PINN:
         self.loss_function = define_loss(self.lossfunc_choice)
 
         logger.info('Wrapping model with DDP')
-        model_ddp = DDP(self.model)
+        #model_ddp = DDP(self.model)
 
         # For GPU
-        #model_ddp = DDP(self.model, device_ids=[proc_index])
+        model_ddp = DDP(self.model, device_ids=[proc_index])
 
         best_val_loss = float('inf')
         #best_model_wts = None

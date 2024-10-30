@@ -150,8 +150,5 @@ def save_variable_with_pickle(variable, variable_name, variable_id, filepath):
 if __name__ == '__main__':
     os.environ['MASTER_ADDR'] = 'localhost'
     os.environ['MASTER_PORT'] = '12355'
-    #run_model('/mnt/iusers01/mace01/w32040lg/mfree_surr/data/Order_2/Noise_0.3/Data', 100*[32], ID='54',
-    #          nprocs=10, path_to_save='./data_out')
-
-    run_model('/home/w32040lg/Shape Function Surrogate/Order_2/Noise_0.3/Data', 7*[64], ID='54',
+    run_model('/mnt/iusers01/mace01/w32040lg/mfree_surr/data/Order_2/Noise_0.3/Data', 7*[64], ID='66',
               nprocs=2, path_to_save='./data_out', model_type='pinn')
