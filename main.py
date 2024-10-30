@@ -18,7 +18,7 @@ import torch
 import torch.multiprocessing as mp
 
 # Set up logging
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
 
@@ -36,11 +36,11 @@ def import_stored_data(base_path, file, order, noise):
     return amat, psi, h[:-1]  # Remove last element for Fortran hovdx variable
 
 
-def run_model(path_to_data, layers, ID, nprocs, path_to_save='./data_out'):
+def run_model(path_to_data, layers, ID, nprocs, model_type, path_to_save='./data_out'):
     logger.info(f'Running model with layers: {layers} and ID: {ID}')
 
     # Define file details in a list of tuples (file_number, noise)
-    file_details = [(6, 0.3)]
+    file_details = [(4, 0.3)]
 
     # Initialize empty lists to store processed data
     amat_list = []
@@ -82,7 +82,7 @@ def run_model(path_to_data, layers, ID, nprocs, path_to_save='./data_out'):
 
     ann = PINN(layers,
                  optimizer='adam',
-                 loss_function='MSE', epochs=1000, batch_size=64, train_f=train_features,
+                 loss_function='MSE', epochs=8, batch_size=64, train_f=train_features,
                  train_l=train_labels, val_f=val_features, val_l=val_labels, moments=polynomial, final_alpha=0.5)
     #ann.fit()
 
@@ -107,14 +107,13 @@ def run_model(path_to_data, layers, ID, nprocs, path_to_save='./data_out'):
     #          train_f=train_features, train_l=train_labels, val_f=val_features, val_l=val_labels)
 
     logger.info('Starting model training')
-    mp.spawn(ann.fit, args=(nprocs,), nprocs=nprocs)
+    mp.spawn(ann.fit, args=(nprocs, path_to_save, 'pinn', ID), nprocs=nprocs)
 
-
-
-    #ann.fit()
-
-    # Save the model
-    save_model_instance(ann, path_to_save, 'res', ID)
+    # Loading saved model
+    attrs_path = os.path.join(path_to_save, f'attrs{ID}.pk')
+    model_path = os.path.join(path_to_save, f'{model_type}{ID}.pth')
+    attr = load_attrs(attrs_path)
+    ann = load_model_instance(model_path, attr, model_type)
 
     # Predict on test data
     test_features = torch.tensor(test_f, dtype=torch.float32)
@@ -155,4 +154,4 @@ if __name__ == '__main__':
     #          nprocs=10, path_to_save='./data_out')
 
     run_model('/home/w32040lg/Shape Function Surrogate/Order_2/Noise_0.3/Data', 7*[64], ID='54',
-              nprocs=10, path_to_save='./data_out')
+              nprocs=2, path_to_save='./data_out', model_type='pinn')
