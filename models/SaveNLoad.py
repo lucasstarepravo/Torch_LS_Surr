@@ -43,9 +43,9 @@ def load_model_instance(filepath, attrs, model_type='ANN'):
     model_state = torch.load(filepath)
 
     # Load the appropriate model type
-    if model_type == 'ANN':
+    if model_type.lower() == 'ann':
         model = ANN_topology(input_size, output_size, hidden_layers)
-    elif model_type == 'PINN':
+    elif model_type.lower() == 'pinn':
         model = PINN_topology(input_size, output_size, hidden_layers)
     else:
         raise ValueError("Invalid model_type. Must be 'ANN' or 'PINN'.")
