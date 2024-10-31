@@ -135,7 +135,6 @@ class PINN:
             # If alpha is not given a value, it will be only finished incremented in the last epoch
             self.alpha_epoch_stop = epochs
 
-
     def fit(self, proc_index, nprocs, path_to_save, model_type, model_ID):
         logger.debug('Importing backend')
         # Initialising backend
@@ -151,14 +150,13 @@ class PINN:
         tr_sampler = torch.utils.data.distributed.DistributedSampler(train_tensor,
                                                                      num_replicas=nprocs, rank=proc_index)
         self.train_loader = torch.utils.data.DataLoader(train_tensor,
-                                                        batch_size=self.batch_size, sampler=tr_sampler, num_workers=4)
+                                                        batch_size=self.batch_size, sampler=tr_sampler, num_workers=0)
 
         val_tensor = TensorDataset(self.val_f, self.val_l)
         val_sampler = torch.utils.data.distributed.DistributedSampler(val_tensor,
-                                                                     num_replicas=nprocs, rank=proc_index)
+                                                                      num_replicas=nprocs, rank=proc_index)
         self.val_loader = torch.utils.data.DataLoader(val_tensor,
-                                                      batch_size=self.batch_size, sampler=val_sampler, num_workers=4)
-
+                                                      batch_size=self.batch_size, sampler=val_sampler, num_workers=0)
 
         logger.debug('Initialising model')
         # Initialising model -- append the end if using GPU
@@ -172,13 +170,12 @@ class PINN:
         self.loss_function = define_loss(self.lossfunc_choice)
 
         logger.info('Wrapping model with DDP')
-        #model_ddp = DDP(self.model)
-
+        # model_ddp = DDP(self.model)
         # For GPU
         model_ddp = DDP(self.model, device_ids=[proc_index])
 
         best_val_loss = float('inf')
-        #best_model_wts = None
+        # best_model_wts = None
 
         training_start_time = time.time()
 
@@ -192,100 +189,95 @@ class PINN:
             alpha = self.final_alpha
 
         logger.info('Setting profiler')
-        with torch.profiler.profile(
-                activities=[torch.profiler.ProfilerActivity.CPU],
-                schedule=torch.profiler.schedule(wait=1, warmup=1, active=3, repeat=1),
-                on_trace_ready=torch.profiler.tensorboard_trace_handler('./log'),
-                record_shapes=True
-        ) as profiler: # whole line for profile
 
-            for epoch in range(self.epochs):
-                epoch_start_time = time.time()
+        for epoch in range(self.epochs):
+            epoch_start_time = time.time()
 
-                model_ddp.train()  # Set model to training mode
-                running_loss = 0.0
+            model_ddp.train()  # Set model to training mode
+            running_loss = 0.0
 
-                if self.dynamic_physics_loss:
-                    if self.alpha_epoch_start <= epoch <= self.alpha_epoch_stop:
-                        alpha = alpha + alpha_increments
+            if self.dynamic_physics_loss:
+                if self.alpha_epoch_start <= epoch <= self.alpha_epoch_stop:
+                    alpha = alpha + alpha_increments
 
-                for inputs, labels in self.train_loader:
-                    self.optimizer.zero_grad()  # Clear previous gradients
-                    outputs = model_ddp(inputs)  # Forward pass
-                    loss = self.loss_function(outputs, labels)  # Calculate loss
+            for inputs, labels in self.train_loader:
+                # Move data to the correct GPU
+                inputs, labels = inputs.to(proc_index), labels.to(proc_index)
 
-                    physics_loss = physics_loss_fn(outputs, inputs, self.moments)
+                self.optimizer.zero_grad()  # Clear previous gradients
+                outputs = model_ddp(inputs)  # Forward pass
+                loss = self.loss_function(outputs, labels)  # Calculate loss
 
-                    # Below I can implement different weights for the monomial physics loss
-                    total_loss = (1 - alpha) * loss + alpha * physics_loss.mean()
+                physics_loss = physics_loss_fn(outputs, inputs, self.moments)
 
-                    total_loss.backward()  # Backward pass
-                    self.optimizer.step()  # Update labels
+                # Below I can implement different weights for the monomial physics loss
+                total_loss = (1 - alpha) * loss + alpha * physics_loss.mean()
 
-                    running_loss += loss.item() * inputs.size(0)
+                total_loss.backward()  # Backward pass
+                self.optimizer.step()  # Update labels
 
-                    profiler.step() # Profile
+                running_loss += loss.item() * inputs.size(0)
 
-                avg_training_loss = running_loss / len(self.train_loader.dataset)
-                training_losses.append(avg_training_loss)
+            avg_training_loss = running_loss / len(self.train_loader.dataset)
+            training_losses.append(avg_training_loss)
 
-                # Calculate validation loss after each epoch
-                val_loss = calculate_val_loss(model_ddp, self.val_loader, self.loss_function)
-                validation_losses.append(val_loss)
+            # Calculate validation loss after each epoch
+            val_loss = calculate_val_loss(model_ddp, self.val_loader, self.loss_function)
+            validation_losses.append(val_loss)
 
-                # If want to free up GPU and calc loss on CPU transfer the operation to the CPU
-                #val_loss = calculate_val_loss(model_ddp.to('cpu'), self.val_loader, self.loss_function)
-                #model_ddp.to(proc_index)
+            # If want to free up GPU and calc loss on CPU transfer the operation to the CPU
+            # val_loss = calculate_val_loss(model_ddp.to('cpu'), self.val_loader, self.loss_function)
+            # model_ddp.to(proc_index)
 
-                # Save the model if the validation loss improved
-                if val_loss < best_val_loss:
-                    best_val_loss = val_loss
-                    best_model_wts = model_ddp.state_dict().copy()  # Deep copy the model labels
-                    #best_model_wts = {k.replace("module.", ""): v for k, v in model_ddp.state_dict().items()}
+            # Save the model if the validation loss improved
+            if val_loss < best_val_loss:
+                best_val_loss = val_loss
+                best_model_wts = model_ddp.state_dict().copy()  # Deep copy the model labels
+                # best_model_wts = {k.replace("module.", ""): v for k, v in model_ddp.state_dict().items()}
 
-                epoch_time = time.time() - epoch_start_time
-                if proc_index == 0:
-                    print(
-                        f'Epoch {epoch + 1}/{self.epochs} - Loss: {avg_training_loss:.4e}, '
-                        f'Validation Loss: {val_loss:.4e}, Time: {epoch_time:.2f}s')
-
-            self.best_model_wts = best_model_wts
-
-            # Calculate and print the total training time
-            total_training_time = time.time() - training_start_time
+            epoch_time = time.time() - epoch_start_time
             if proc_index == 0:
-                print(f'Total training time: {total_training_time:.3f}s')
+                print(
+                    f'Epoch {epoch + 1}/{self.epochs} - Loss: {avg_training_loss:.4e}, '
+                    f'Validation Loss: {val_loss:.4e}, Time: {epoch_time:.2f}s')
 
-            self.training_loss = training_losses
-            self.val_loss = validation_losses
+        self.best_model_wts = best_model_wts
 
-            # Save model, training history and attributes
-            if proc_index == 0 and self.best_model_wts is not None:
-                logger.info(f'Process {proc_index} is attempting to save the model.')
-                # Ensure the directory exists
-                os.makedirs(path_to_save, exist_ok=True)
+        # Calculate and print the total training time
+        total_training_time = time.time() - training_start_time
+        if proc_index == 0:
+            print(f'Total training time: {total_training_time:.3f}s')
 
-                # Save the PyTorch model's state dict from the `model` attribute
-                model_path = os.path.join(path_to_save, f'{model_type}{model_ID}.pth')
-                consume_pref(self.best_model_wts, prefix="module.")
+        self.training_loss = training_losses
+        self.val_loss = validation_losses
 
-                # Prepare attributes to save
-                attrs = {
-                    'input_size': self.input_size,
-                    'output_size': self.output_size,
-                    'hidden_layers': self.hidden_layers,
-                    'history': (self.training_loss, self.val_loss)
-                }
+        # Save model, training history and attributes
+        if proc_index == 0 and self.best_model_wts is not None:
+            logger.info(f'Process {proc_index} is attempting to save the model.')
+            # Ensure the directory exists
+            os.makedirs(path_to_save, exist_ok=True)
 
-                # Save the attributes using pickle
-                attrs_path = os.path.join(path_to_save, f'attrs{model_ID}.pk')
-                with open(attrs_path, 'wb') as f:
-                    pk.dump(attrs, f)
+            # Save the PyTorch model's state dict from the `model` attribute
+            model_path = os.path.join(path_to_save, f'{model_type}{model_ID}.pth')
+            consume_pref(self.best_model_wts, prefix="module.")
 
-                self.model.load_state_dict(self.best_model_wts)
-                torch.save(self.model.state_dict(), model_path)  # Access the internal `model` attribute
+            # Prepare attributes to save
+            attrs = {
+                'input_size': self.input_size,
+                'output_size': self.output_size,
+                'hidden_layers': self.hidden_layers,
+                'history': (self.training_loss, self.val_loss)
+            }
 
-            dist.destroy_process_group()
+            # Save the attributes using pickle
+            attrs_path = os.path.join(path_to_save, f'attrs{model_ID}.pk')
+            with open(attrs_path, 'wb') as f:
+                pk.dump(attrs, f)
+
+            self.model.load_state_dict(self.best_model_wts)
+            torch.save(self.model.state_dict(), model_path)  # Access the internal `model` attribute
+
+        dist.destroy_process_group()
 
     def predict(self, input):
         self.model.eval()
