@@ -224,8 +224,6 @@ class PINN:
             avg_training_loss = running_loss / len(self.train_loader.dataset)
             training_losses.append(avg_training_loss)
 
-            # Calculate validation loss after each epoch
-            self.val_loader = self.val_loader.to(proc_index)
             val_loss = calculate_val_loss(model_ddp, self.val_loader, self.loss_function, proc_index)
             validation_losses.append(val_loss)
 
