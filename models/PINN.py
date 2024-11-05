@@ -44,11 +44,12 @@ class PINN_topology(nn.Module):
         return x
 
 
-def calculate_val_loss(model, val_loader, loss_function):
+def calculate_val_loss(model, val_loader, loss_function, proc_index):
     model.eval()  # Set model to evaluation mode
     val_loss = 0
     with torch.no_grad():  # No gradients required for validation step
         for inputs, labels in val_loader:
+            inputs, labels = inputs.to(proc_index), labels.to(proc_index)
             outputs = model(inputs)
             loss = loss_function(outputs, labels)
             val_loss += loss.item() * inputs.size(0)
@@ -75,7 +76,9 @@ def physics_loss_fn(outputs, inputs, physics_loss):
     n = int((physics_loss ** 2 + 3 * physics_loss) / 2)
     moments = calc_moments_torch(inputs, outputs, n)
 
-    target_moments = torch.zeros((outputs.shape[0], n)) #make sure the outputs.shape[0] is capturing the dimension I want
+    #target_moments = torch.zeros((outputs.shape[0], n)) #make sure the outputs.shape[0] is capturing the dimension I want
+    # Create the target moments tensor on the same device as the outputs
+    target_moments = torch.zeros((outputs.shape[0], n), device=outputs.device)
     target_moments[:, 2] = 1
     target_moments[:, 4] = 1
     physics_loss = (target_moments - moments) ** 2
@@ -172,7 +175,7 @@ class PINN:
         logger.info('Wrapping model with DDP')
         # model_ddp = DDP(self.model)
         # For GPU
-        model_ddp = DDP(self.model, device_ids=[proc_index])
+        model_ddp = DDP(self.model, device_ids=[proc_index], output_device=proc_index)
 
         best_val_loss = float('inf')
         # best_model_wts = None
@@ -222,7 +225,8 @@ class PINN:
             training_losses.append(avg_training_loss)
 
             # Calculate validation loss after each epoch
-            val_loss = calculate_val_loss(model_ddp, self.val_loader, self.loss_function)
+            self.val_loader = self.val_loader.to(proc_index)
+            val_loss = calculate_val_loss(model_ddp, self.val_loader, self.loss_function, proc_index)
             validation_losses.append(val_loss)
 
             # If want to free up GPU and calc loss on CPU transfer the operation to the CPU
