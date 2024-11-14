@@ -40,7 +40,7 @@ def run_model(path_to_data, layers, ID, nprocs, model_type, path_to_save='./data
     logger.info(f'Running model with layers: {layers} and ID: {ID}')
 
     # Define file details in a list of tuples (file_number, noise)
-    file_details = [(4, 0.3)]
+    file_details = [(7, 0.3)]
 
     # Initialize empty lists to store processed data
     amat_list = []
@@ -92,9 +92,8 @@ def run_model(path_to_data, layers, ID, nprocs, model_type, path_to_save='./data
 
 
     #ann = ResNet(layers, optimizer='adam',
-    #              loss_function='MSE', epochs=1000, batch_size=64, train_f=train_features, train_l=train_labels,
-    #              val_f=val_features, val_l=val_labels, skip_connections=[(0, 99), (1, 19), (20, 39), (40, 59),
-    #              (60, 79), (80, 98)])
+    #              loss_function='MSE', epochs=8, batch_size=128, train_f=train_features, train_l=train_labels,
+    #              val_f=val_features, val_l=val_labels, skip_connections=[(0, 9)])
 
     # pinn_res2 = PINN_ResNet(layers,
     #                       optimizer='adam', loss_function='sgs', epochs=3000, batch_size=128, train_f=train_features,
@@ -150,5 +149,5 @@ def save_variable_with_pickle(variable, variable_name, variable_id, filepath):
 if __name__ == '__main__':
     os.environ['MASTER_ADDR'] = 'localhost'
     os.environ['MASTER_PORT'] = '12355'
-    run_model('/mnt/iusers01/mace01/w32040lg/mfree_surr/data/Order_2/Noise_0.3/Data', 7*[64], ID='66',
+    run_model('/mnt/iusers01/mace01/w32040lg/mfree_surr/data/Order_2/Noise_0.3/Data', 7*[64], ID='77',
               nprocs=2, path_to_save='./data_out', model_type='pinn')
