@@ -40,7 +40,7 @@ def load_model_instance(filepath, attrs, model_type='ANN'):
     input_size = attrs['input_size']
     output_size = attrs['output_size']
     hidden_layers = attrs['hidden_layers']
-    model_state = torch.load(filepath)
+    model_state = torch.load(filepath, map_location=torch.device('cpu'))
 
     # Load the appropriate model type
     if model_type.lower() == 'ann':
