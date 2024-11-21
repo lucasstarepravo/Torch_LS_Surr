@@ -1,6 +1,7 @@
 import torch
 from models.ANN import ANN_topology
 from models.PINN import PINN_topology
+from models.ResNet import ResNet_topology
 import pickle as pk
 import os
 
@@ -35,18 +36,20 @@ def load_attrs(filepath):
     return attrs
 
 
-def load_model_instance(filepath, attrs, model_type='ANN'):
+def load_model_instance(filepath, attrs, skip_connections, model_type='ANN'):
     ''' In this case the filepath must contain the complete directory including the file'''
     input_size = attrs['input_size']
     output_size = attrs['output_size']
     hidden_layers = attrs['hidden_layers']
-    model_state = torch.load(filepath)
+    model_state = torch.load(filepath, map_location=torch.device('cpu'))
 
     # Load the appropriate model type
     if model_type.lower() == 'ann':
         model = ANN_topology(input_size, output_size, hidden_layers)
     elif model_type.lower() == 'pinn':
         model = PINN_topology(input_size, output_size, hidden_layers)
+    elif model_type.lower() == 'resnet':
+        model = ResNet_topology(input_size, output_size, hidden_layers, skip_connections)
     else:
         raise ValueError("Invalid model_type. Must be 'ANN' or 'PINN'.")
 
