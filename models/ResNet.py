@@ -187,9 +187,10 @@ class ResNet:
                 best_model_wts = self.model.state_dict().copy()  # Deep copy the model labels
 
             epoch_time = time.time() - epoch_start_time
-            print(
-                f'Epoch {epoch + 1}/{self.epochs} - Loss: {avg_training_loss:.4e}, '
-                f'Validation Loss: {val_loss:.4e}, Time: {epoch_time:.2f}s')
+            if proc_index==0:
+                print(
+                      f'Epoch {epoch + 1}/{self.epochs} - Loss: {avg_training_loss:.4e}, '
+                      f'Validation Loss: {val_loss:.4e}, Time: {epoch_time:.2f}s')
 
         self.best_model_wts = best_model_wts
 
