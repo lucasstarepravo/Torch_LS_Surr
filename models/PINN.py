@@ -192,7 +192,7 @@ class PINN:
             alpha = self.final_alpha
 
         logger.info('Setting profiler')
-
+        checkpoint_interval = 1000
         for epoch in range(self.epochs):
             epoch_start_time = time.time()
 
@@ -242,6 +242,16 @@ class PINN:
                 print(
                     f'Epoch {epoch + 1}/{self.epochs} - Loss: {avg_training_loss:.4e}, '
                     f'Validation Loss: {val_loss:.4e}, Time: {epoch_time:.2f}s')
+
+                if epoch % checkpoint_interval == 0 or epoch == self.epochs - 1:
+                        checkpoint_path = os.path.join(path_to_save, f'checkpoint_{model_type}_{model_ID}_epoch_{epoch}.pth')
+                        torch.save({
+                        'epoch': epoch,
+                        'model_state_dict': model_ddp.state_dict(),
+                        'optimizer_state_dict': self.optimizer.state_dict(),
+                         'best_val_loss': best_val_loss,
+                        }, checkpoint_path)
+                        logger.info(f'Checkpoint saved at {checkpoint_path}')
 
         self.best_model_wts = best_model_wts
 
