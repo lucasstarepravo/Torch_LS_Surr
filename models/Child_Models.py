@@ -1,11 +1,7 @@
-import torch
 import torch.nn as nn
-import torch.optim as optim
-from torch.utils.data import DataLoader, TensorDataset
 from models.NN_Base import BaseModel
 import torch
-import time
-from tqdm import tqdm
+
 
 
 def monomial_power_torch(polynomial):
@@ -76,19 +72,19 @@ class ResNet(BaseModel):
         # Use ModuleList to hold all the layers
         return nn.ModuleList(layers)
 
-    def forward(self, x): # make sure the predict method of the parent class is using this forward propagation
+    def forward_with_ddp(self, model_ddp, inputs): # make sure the predict method of the parent class is using this forward propagation
         resblock_output = {}
-        for i, layer in enumerate(self.model): # self.model was initially self.layers, which is originally the output of the method above
+        for i, layer in enumerate(model_ddp): # self.model was initially self.layers, which is originally the output of the method above
             res_block = [(index, tup) for index, tup in enumerate(self.scaled_skip_connection) if
                          i in tup]  # This checks if the current layer is supposed to be a residual block
             # For now, this code only works with unique receiving and sending block layers (a layer cannot receive to past outputs, or receive and send the output through the same layer)
             if res_block:
                 if i == res_block[0][1][0]:  # This checks if this is the start or finish of residual block
-                    x = layer(x)
-                    resblock_output[res_block[0][1][1]] = x
+                    inputs = layer(inputs)
+                    resblock_output[res_block[0][1][1]] = inputs
                 else:
-                    x = layer(x)
-                    x = x + resblock_output[i]
+                    inputs = layer(inputs)
+                    inputs = inputs + resblock_output[i]
             else:
-                x = layer(x)
-        return x
+                inputs = layer(inputs)
+        return inputs
