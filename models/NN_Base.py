@@ -6,7 +6,7 @@ import torch.nn as nn
 import torch.distributed as dist
 from torch.utils.data import DataLoader, TensorDataset
 from torch.nn.parallel import DistributedDataParallel as DDP
-from torch.nn.modules.utils import consume_prefix_in_state_dict_if_present as consume_pref
+from torch import Tensor
 import pickle as pk
 import torch.multiprocessing as mp
 
@@ -26,7 +26,16 @@ def define_loss(loss_function):
 
 
 class BaseModel:
-    def __init__(self, hidden_layers, optimizer, loss_function, epochs, batch_size, train_f, train_l, val_f, val_l):
+    def __init__(self,
+                 hidden_layers: list,
+                 optimizer: str,
+                 loss_function: str,
+                 epochs: int,
+                 batch_size: int,
+                 train_f: Tensor,
+                 train_l: Tensor,
+                 val_f: Tensor,
+                 val_l: Tensor) -> None:
         """
         Base model to handle shared logic across different neural network architectures.
 
@@ -155,7 +164,7 @@ class BaseModel:
 
                 # Checkpoint to save model while training
                 if epoch % checkpoint_interval == 0 or epoch == self.epochs - 1:
-                    instance_path = os.path.join(path_to_save, f'checkpoint_instance_{model_ID}.pkl')
+                    instance_path = os.path.join(path_to_save, f'checkpoint_instance_{model_ID}.pk')
                     with open(instance_path, 'wb') as f:
                         pk.dump(self, f)  # Save the entire instance
                     logger.info(f'Checkpoint saved at {instance_path}')
@@ -164,9 +173,9 @@ class BaseModel:
         total_training_time = time.time() - training_start_time
         if proc_index == 0:
             print(f'Total training time: {total_training_time:.3f}s')
+            # Save the model
+            self.save_model(proc_index, path_to_save, model_type, model_ID)
 
-        # Save the model
-        self.save_model(proc_index, path_to_save, model_type, model_ID)
         dist.destroy_process_group()
 
     def forward_with_ddp(self, model_ddp, inputs):
@@ -189,14 +198,32 @@ class BaseModel:
                 val_loss += loss.item() * inputs.size(0)
         return val_loss / len(self.val_loader.dataset)
 
-    def save_model(self, proc_index, path_to_save, model_type, model_ID):
+    def save_model(self, path_to_save, model_type, model_ID, **kwargs):
         """Save the best model weights."""
-        if proc_index == 0 and self.best_model_wts is not None:
+        if self.best_model_wts is not None:
+            # Creates folder to save
             os.makedirs(path_to_save, exist_ok=True)
-            model_path = os.path.join(path_to_save, f"{model_type}_{model_ID}.pth")
-            consume_pref(self.best_model_wts, prefix="module.")
+
+            # Saves model
+            model_path = os.path.join(path_to_save, f"{model_type}{model_ID}.pth")
             torch.save(self.best_model_wts, model_path)
             print(f"Model saved at {model_path}")
+
+            # Saves attributes
+            attrs = {
+                'input_size': self.input_size,
+                'output_size': self.output_size,
+                'hidden_layers': self.hidden_layers,
+                'history': (self.training_loss, self.val_loss),
+            }
+
+            # Add additional attributes from kwargs
+            for key, value in kwargs.items():
+                attrs[key] = value
+
+            attrs_path = os.path.join(path_to_save, f'attrs{model_ID}.pk')
+            with open(attrs_path, 'wb') as f:
+                pk.dump(attrs, f)
 
     def predict(self, inputs, proc_index):
         """Run inference."""
@@ -209,12 +236,13 @@ class BaseModel:
         return torch.cat(predictions, dim=0)
 
     @staticmethod
-    def continue_training(nprocs, path_to_save, model_type, model_ID, instance_path, epochs):
+    def continue_training(nprocs, path_to_save, model_type, model_ID, epochs):
+        instance_path = os.path.join(path_to_save, f"checkpoint_instance_{model_ID}.pk")
         with open(instance_path, 'rb') as f:
             loaded_instance = pk.load(f)
 
         # Move to appropriate device
-        loaded_instance.model = loaded_instance.model.to('cuda')
+        loaded_instance.model = loaded_instance.model.to('cpu')
         loaded_instance.epochs = epochs
 
         mp.spawn(
