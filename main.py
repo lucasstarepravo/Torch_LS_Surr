@@ -3,11 +3,8 @@ from sklearn.model_selection import train_test_split
 from data_processing.preprocessing import *
 from data_processing.postprocessing import *
 from Plots import *
-from models.ANN import ANN
-from models.PINN import PINN
-from models.GP import GP
-from models.PINN_ResNet import PINN_ResNet
-from models.ResNet import ResNet
+from models.NN_Base import BaseModel
+from models.Child_Models import PINN, ResNet
 from models.SaveNLoad import *
 import numpy as np
 import pickle as pk
@@ -78,19 +75,17 @@ def run_model(path_to_data, layers, ID, nprocs, model_type, path_to_save='./data
     train_labels = torch.tensor(train_l, dtype=torch.float32)
     val_features = torch.tensor(val_f, dtype=torch.float32)
     val_labels = torch.tensor(val_l, dtype=torch.float32)
-    
+
     skip_connections = [(0, 9)]
 
-    ann = PINN(layers,
-                 optimizer='adam',
-                 loss_function='MSE', epochs=100000, batch_size=128, train_f=train_features,
-                 train_l=train_labels, val_f=val_features, val_l=val_labels, moments=polynomial, final_alpha=0.5)
+    ann = PINN(hidden_layers=layers,
+               optimizer='adam', loss_function='MSE', epochs=100000, batch_size=128, train_f=train_features,
+               train_l=train_labels, val_f=val_features, val_l=val_labels, moments_order=polynomial, alpha=0.5)
     #ann.fit()
 
     # ann = ANN(layers, optimizer='adam', loss_function='MSE',
     #          epochs=1500, batch_size=64, train_f=train_features, train_l=train_labels, val_f=val_features,
     #          val_l=val_labels)
-
 
     #ann = ResNet(layers, optimizer='adam',
     #              loss_function='MSE', epochs=50000, batch_size=128, train_f=train_features, train_l=train_labels,
@@ -109,11 +104,29 @@ def run_model(path_to_data, layers, ID, nprocs, model_type, path_to_save='./data
     logger.info('Starting model training')
     mp.spawn(ann.fit, args=(nprocs, path_to_save, 'resnet', ID), nprocs=nprocs)
 
-    # Loading saved model
+    # Load attributes and model state
     attrs_path = os.path.join(path_to_save, f'attrs{ID}.pk')
     model_path = os.path.join(path_to_save, f'{model_type}{ID}.pth')
-    attr = load_attrs(attrs_path)
-    ann = load_model_instance(model_path, attr, skip_connections=skip_connections, model_type=model_type)
+
+    with open(attrs_path, 'rb') as f:
+        attrs = pk.load(f)
+
+    # Create a new instance of ResNet
+    ann = ResNet(
+        skip_connections=attrs.get('skip_connections', None),
+        hidden_layers=[],  # Temporary placeholder; will be updated by `load_model_instance`
+        optimizer=None,  # Placeholder
+        loss_function=None,  # Placeholder
+        epochs=0,  # Placeholder
+        batch_size=0,  # Placeholder
+        train_f=None,  # Placeholder
+        train_l=None,  # Placeholder
+        val_f=None,  # Placeholder
+        val_l=None,  # Placeholder,
+    )
+
+    # Load the model
+    ann = load_model_instance(model_path, attrs, ann)
 
     # Predict on test data
     test_features = torch.tensor(test_f, dtype=torch.float32)
@@ -150,5 +163,5 @@ def save_variable_with_pickle(variable, variable_name, variable_id, filepath):
 if __name__ == '__main__':
     os.environ['MASTER_ADDR'] = 'localhost'
     os.environ['MASTER_PORT'] = '12355'
-    run_model('/mnt/iusers01/mace01/w32040lg/mfree_surr/data/Order_2/Noise_0.3/Data2', 7*[64], ID='66',
+    run_model('/mnt/iusers01/mace01/w32040lg/mfree_surr/data/Order_2/Noise_0.3/Data2', 7 * [64], ID='66',
               nprocs=2, path_to_save='./data_out', model_type='pinn')
