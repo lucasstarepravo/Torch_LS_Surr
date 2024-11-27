@@ -8,5 +8,4 @@ if __name__ == '__main__':
                                 path_to_save='./data_out',
                                 model_type='pinn',
                                 model_ID='63',
-                                instance_path='./data_out/checkpoint',
-                                epochs=10000)
+                                epochs=1000)
