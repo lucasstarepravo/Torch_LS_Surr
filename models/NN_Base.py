@@ -178,6 +178,11 @@ class BaseModel:
 
         dist.destroy_process_group()
 
+    def forward(self, x):
+        for layer in self.model:
+            x = layer(x)
+        return x
+
     def forward_with_ddp(self, model_ddp, inputs):
         """Override if specific forward behavior is required."""
         return model_ddp(inputs)

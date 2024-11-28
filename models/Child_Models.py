@@ -86,7 +86,7 @@ class ResNet(BaseModel):
         # Use ModuleList to hold all the layers
         return nn.ModuleList(layers)
 
-    def forward(self, inputs): # make sure the predict method of the parent class is using this forward propagation
+    def forward(self, input): # make sure the predict method of the parent class is using this forward propagation
         resblock_output = {}
         for i, layer in enumerate(self.model): # self.model was initially self.layers, which is originally the output of the method above
             res_block = [(index, tup) for index, tup in enumerate(self.scaled_skip_connection)
