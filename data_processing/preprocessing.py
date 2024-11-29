@@ -8,6 +8,7 @@ import torch
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
+
 def standardize_psi(psi,h, derivative):
     if derivative not in ['dtdx', 'dtdy', 'Laplace']:
         raise ValueError("Invalid derivative type")
