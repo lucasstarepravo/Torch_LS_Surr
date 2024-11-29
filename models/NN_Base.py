@@ -10,7 +10,6 @@ from torch import Tensor
 import pickle as pk
 import torch.multiprocessing as mp
 
-
 # Logging setup
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
@@ -25,55 +24,13 @@ def define_loss(loss_function):
         raise ValueError(f"Unsupported loss function: {loss_function}")
 
 
-class BaseModel:
-    def __init__(self,
-                 hidden_layers: list,
-                 optimizer: str,
-                 loss_function: str,
-                 epochs: int,
-                 batch_size: int,
-                 train_f: Tensor,
-                 train_l: Tensor,
-                 val_f: Tensor,
-                 val_l: Tensor) -> None:
-        """
-        Base model to handle shared logic across different neural network architectures.
-
-        Args:
-            hidden_layers (list): List defining the number of neurons in each hidden layer.
-            optimizer (str): Optimizer name (e.g., 'adam', 'sgd').
-            loss_function (str): Loss function name (e.g., 'MSE', 'MAE').
-            epochs (int): Number of training epochs.
-            batch_size (int): Batch size for training and validation.
-            train_f (torch.Tensor): Training features.
-            train_l (torch.Tensor): Training labels.
-            val_f (torch.Tensor): Validation features.
-            val_l (torch.Tensor): Validation labels.
-        """
-        self.input_size = train_f.shape[1]
-        self.output_size = train_l.shape[1]
+class NN_Topology(nn.Module):
+    def __init__(self, input_size, hidden_layers, output_size):
+        super(NN_Topology, self).__init__()
+        self.input_size = input_size
         self.hidden_layers = hidden_layers
-        self.epochs = epochs
-        self.batch_size = batch_size
+        self.output_size = output_size
 
-        # Store data
-        self.train_f = train_f
-        self.train_l = train_l
-        self.val_f = val_f
-        self.val_l = val_l
-
-        # Define model and optimization
-        self.optimizer_str = optimizer
-        self.loss_function_str = loss_function
-
-        # Training and validation history
-        self.best_model_wts = None
-        self.training_loss = []
-        self.val_loss = []
-
-        # Attributes that must be defined within the distributed method
-
-    def create_model(self):
         layers = [nn.Linear(self.input_size, self.hidden_layers[0])]
         layers += [nn.LayerNorm(self.hidden_layers[0])]
         layers += [nn.SiLU()]
@@ -85,9 +42,51 @@ class BaseModel:
 
         # Add the final layer
         layers.append(nn.Linear(self.hidden_layers[-1], self.output_size))
+        self.layers = nn.ModuleList(layers)
 
-        # Use ModuleList to hold all the layers
-        return nn.ModuleList(layers)
+    def forward(self, input):
+        for layer in self.layers:
+            input = layer(input)
+        return input
+
+
+class BaseModel:
+    def __init__(self,
+                 hidden_layers: list,
+                 optimizer: str,
+                 loss_function: str,
+                 epochs: int,
+                 batch_size: int,
+                 train_f: Tensor,
+                 train_l: Tensor) -> None:
+        """
+        Base model to handle shared logic across different neural network architectures.
+
+        Args:
+            hidden_layers (list): List defining the number of neurons in each hidden layer.
+            optimizer (str): Optimizer name (e.g., 'adam', 'sgd').
+            loss_function (str): Loss function name (e.g., 'MSE', 'MAE').
+            epochs (int): Number of training epochs.
+            batch_size (int): Batch size for training and validation.
+            train_f (torch.Tensor): Training features.
+            train_l (torch.Tensor): Training labels.
+        """
+        self.input_size = train_f.shape[1]
+        self.output_size = train_l.shape[1]
+        self.hidden_layers = hidden_layers
+        self.epochs = epochs
+        self.batch_size = batch_size
+        self.model = NN_Topology(self.input_size, hidden_layers, self.output_size)
+
+        # Define model and optimization
+        self.optimizer_str = optimizer
+        self.loss_function_str = loss_function
+
+        # Training and validation history
+        self.best_model_wts = None
+        self.training_loss = []
+        self.val_loss = []
+
 
     def define_optimizer(self, optimizer):
         if optimizer == 'adam':
@@ -97,7 +96,11 @@ class BaseModel:
         else:
             raise ValueError(f"Unsupported optimizer: {optimizer}")
 
-    def fit(self, proc_index, nprocs, path_to_save, model_type, model_ID):
+    def fit(self, proc_index, nprocs, path_to_save, model_type, model_ID,
+            train_f: Tensor,
+            train_l: Tensor,
+            val_f: Tensor,
+            val_l: Tensor):
         """Train the model using Distributed Data Parallel (DDP)."""
         # Initialize DDP
         dist.init_process_group(backend='nccl', world_size=nprocs, rank=proc_index)
@@ -105,21 +108,19 @@ class BaseModel:
 
         # Preparing data for DDP
         # Training data
-        train_tensor = TensorDataset(self.train_f, self.train_l)
+        train_tensor = TensorDataset(train_f, train_l)
         tr_sampler = torch.utils.data.distributed.DistributedSampler(train_tensor,
                                                                      num_replicas=nprocs, rank=proc_index)
-        self.train_loader = torch.utils.data.DataLoader(train_tensor,
-                                                        batch_size=self.batch_size, sampler=tr_sampler, num_workers=4)
+        train_loader = torch.utils.data.DataLoader(train_tensor,
+                                                   batch_size=self.batch_size, sampler=tr_sampler, num_workers=4)
 
         # Validation data
-        val_tensor = TensorDataset(self.val_f, self.val_l)
+        val_tensor = TensorDataset(val_f, val_l)
         val_sampler = torch.utils.data.distributed.DistributedSampler(val_tensor,
                                                                       num_replicas=nprocs, rank=proc_index)
-        self.val_loader = torch.utils.data.DataLoader(val_tensor,
-                                                      batch_size=self.batch_size, sampler=val_sampler, num_workers=4)
+        val_loader = torch.utils.data.DataLoader(val_tensor,
+                                                 batch_size=self.batch_size, sampler=val_sampler, num_workers=4)
 
-        # Creating pytorch model
-        self.model = self.create_model()
         self.optimizer = self.define_optimizer(self.optimizer_str)
         self.loss_function = define_loss(self.loss_function_str)
 
@@ -135,7 +136,7 @@ class BaseModel:
             model_ddp.train()
             running_loss = 0.0
 
-            for inputs, labels in self.train_loader:
+            for inputs, labels in train_loader:
                 inputs, labels = inputs.to(proc_index), labels.to(proc_index)
                 self.optimizer.zero_grad()
                 outputs = self.forward_with_ddp(model_ddp, inputs)
@@ -144,11 +145,11 @@ class BaseModel:
                 self.optimizer.step()
                 running_loss += loss.item() * inputs.size(0)
 
-            avg_training_loss = running_loss / len(self.train_loader.dataset)
+            avg_training_loss = running_loss / len(train_loader.dataset)
             self.training_loss.append(avg_training_loss)
 
             # Validation
-            val_loss = self.calculate_val_loss(model_ddp, proc_index)
+            val_loss = self.calculate_val_loss(model_ddp, proc_index, val_loader)
             self.val_loss.append(val_loss)
             model_ddp.train()
 
@@ -174,16 +175,12 @@ class BaseModel:
         if proc_index == 0:
             print(f'Total training time: {total_training_time:.3f}s')
             # Save the model
-            self.save_model(proc_index, path_to_save, model_type, model_ID)
+            self.save_model(path_to_save, model_type, model_ID)
 
         dist.destroy_process_group()
 
-    def forward(self, x):
-        for layer in self.model:
-            x = layer(x)
-        return x
-
-    def forward_with_ddp(self, model_ddp, inputs):
+    @staticmethod
+    def forward_with_ddp(model_ddp, inputs):
         """Override if specific forward behavior is required."""
         return model_ddp(inputs)
 
@@ -191,17 +188,17 @@ class BaseModel:
         """Override if specific loss behavior is required."""
         return self.loss_function(outputs, labels)
 
-    def calculate_val_loss(self, model, proc_index):
+    def calculate_val_loss(self, model_ddp, proc_index, val_loader):
         """Calculate validation loss."""
-        model.eval()
+        model_ddp.eval()
         val_loss = 0
         with torch.no_grad():
-            for inputs, labels in self.val_loader:
+            for inputs, labels in val_loader:
                 inputs, labels = inputs.to(proc_index), labels.to(proc_index)
-                outputs = model(inputs)
+                outputs = model_ddp(inputs)
                 loss = self.loss_function(outputs, labels)
                 val_loss += loss.item() * inputs.size(0)
-        return val_loss / len(self.val_loader.dataset)
+        return val_loss / len(val_loader.dataset)
 
     def save_model(self, path_to_save, model_type, model_ID, **kwargs):
         """Save the best model weights."""
@@ -241,7 +238,11 @@ class BaseModel:
         return torch.cat(predictions, dim=0)
 
     @staticmethod
-    def continue_training(nprocs, path_to_save, model_type, model_ID, epochs):
+    def continue_training(nprocs, path_to_save, model_type, model_ID, epochs,
+                          train_f: Tensor,
+                          train_l: Tensor,
+                          val_f: Tensor,
+                          val_l: Tensor):
         instance_path = os.path.join(path_to_save, f"checkpoint_instance_{model_ID}.pk")
         with open(instance_path, 'rb') as f:
             loaded_instance = pk.load(f)
@@ -252,6 +253,6 @@ class BaseModel:
 
         mp.spawn(
             loaded_instance.fit,
-            args=(nprocs, path_to_save, model_type, model_ID),
+            args=(nprocs, path_to_save, model_type, model_ID, train_f, train_l, val_f, val_l),
             nprocs=nprocs,
             join=True)
