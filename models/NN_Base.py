@@ -8,7 +8,6 @@ from torch.utils.data import DataLoader, TensorDataset
 from torch.nn.parallel import DistributedDataParallel as DDP
 from torch import Tensor
 import pickle as pk
-import torch.multiprocessing as mp
 
 # Logging setup
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
@@ -16,12 +15,15 @@ logger = logging.getLogger(__name__)
 
 
 def define_loss(loss_function):
-    if loss_function == 'MAE':
-        return torch.nn.L1Loss()
-    elif loss_function == 'MSE':
-        return torch.nn.MSELoss()
+    if isinstance(loss_function, str):
+        if loss_function == 'MAE':
+            return torch.nn.L1Loss()
+        elif loss_function == 'MSE':
+            return torch.nn.MSELoss()
+        else:
+            raise ValueError(f"Unsupported loss function: {loss_function}")
     else:
-        raise ValueError(f"Unsupported loss function: {loss_function}")
+        return loss_function
 
 
 class NN_Topology(nn.Module):
@@ -57,8 +59,8 @@ class BaseModel:
                  loss_function: str,
                  epochs: int,
                  batch_size: int,
-                 train_f: Tensor,
-                 train_l: Tensor) -> None:
+                 train_f: Tensor | int,
+                 train_l: Tensor | int) -> None:
         """
         Base model to handle shared logic across different neural network architectures.
 
@@ -71,30 +73,34 @@ class BaseModel:
             train_f (torch.Tensor): Training features.
             train_l (torch.Tensor): Training labels.
         """
-        self.input_size = train_f.shape[1]
-        self.output_size = train_l.shape[1]
+        self.input_size = train_f if isinstance(train_f, int) else int(train_f.shape[1])
+        self.output_size = train_l if isinstance(train_l, int) else int(train_l.shape[1])
         self.hidden_layers = hidden_layers
         self.epochs = epochs
         self.batch_size = batch_size
         self.model = NN_Topology(self.input_size, hidden_layers, self.output_size)
 
         # Define model and optimization
-        self.optimizer_str = optimizer
-        self.loss_function_str = loss_function
+        self.optimizer = self.define_optimizer(optimizer)
+        self.loss_function = define_loss(loss_function)
 
         # Training and validation history
         self.best_model_wts = None
-        self.training_loss = []
+        self.tr_loss = []
         self.val_loss = []
+        self.best_val_loss = float('inf')
 
 
     def define_optimizer(self, optimizer):
-        if optimizer == 'adam':
-            return torch.optim.Adam(self.model.parameters())
-        elif optimizer == 'sgd':
-            return torch.optim.SGD(self.model.parameters(), lr=0.01, momentum=0.9)
+        if isinstance(optimizer, str):
+            if optimizer == 'adam':
+                return torch.optim.Adam(self.model.parameters())
+            elif optimizer == 'sgd':
+                return torch.optim.SGD(self.model.parameters(), lr=0.01, momentum=0.9)
+            else:
+                raise ValueError(f"Unsupported optimizer: {optimizer}")
         else:
-            raise ValueError(f"Unsupported optimizer: {optimizer}")
+            return optimizer
 
     def fit(self, proc_index, nprocs, path_to_save, model_type, model_ID,
             train_f: Tensor,
@@ -109,25 +115,19 @@ class BaseModel:
         # Preparing data for DDP
         # Training data
         train_tensor = TensorDataset(train_f, train_l)
-        tr_sampler = torch.utils.data.distributed.DistributedSampler(train_tensor,
-                                                                     num_replicas=nprocs, rank=proc_index)
-        train_loader = torch.utils.data.DataLoader(train_tensor,
-                                                   batch_size=self.batch_size, sampler=tr_sampler, num_workers=4)
+        tr_sampler = torch.utils.data.distributed.DistributedSampler(train_tensor, num_replicas=nprocs, rank=proc_index)
+        train_loader = torch.utils.data.DataLoader(train_tensor, batch_size=self.batch_size,
+                                                   sampler=tr_sampler, num_workers=4)
 
         # Validation data
         val_tensor = TensorDataset(val_f, val_l)
-        val_sampler = torch.utils.data.distributed.DistributedSampler(val_tensor,
-                                                                      num_replicas=nprocs, rank=proc_index)
-        val_loader = torch.utils.data.DataLoader(val_tensor,
-                                                 batch_size=self.batch_size, sampler=val_sampler, num_workers=4)
-
-        self.optimizer = self.define_optimizer(self.optimizer_str)
-        self.loss_function = define_loss(self.loss_function_str)
+        val_sampler = torch.utils.data.distributed.DistributedSampler(val_tensor, num_replicas=nprocs, rank=proc_index)
+        val_loader = torch.utils.data.DataLoader(val_tensor, batch_size=self.batch_size,
+                                                 sampler=val_sampler, num_workers=4)
 
         self.model = self.model.to(proc_index)
         model_ddp = DDP(self.model, device_ids=[proc_index], output_device=proc_index)
 
-        best_val_loss = float('inf')
         training_start_time = time.time()
         checkpoint_interval = 1000
 
@@ -146,7 +146,7 @@ class BaseModel:
                 running_loss += loss.item() * inputs.size(0)
 
             avg_training_loss = running_loss / len(train_loader.dataset)
-            self.training_loss.append(avg_training_loss)
+            self.tr_loss.append(avg_training_loss)
 
             # Validation
             val_loss = self.calculate_val_loss(model_ddp, proc_index, val_loader)
@@ -154,8 +154,8 @@ class BaseModel:
             model_ddp.train()
 
             # Save the best model weights
-            if val_loss < best_val_loss:
-                best_val_loss = val_loss
+            if val_loss < self.best_val_loss:
+                self.best_val_loss = val_loss
                 self.best_model_wts = model_ddp.state_dict().copy()
 
             epoch_time = time.time() - epoch_start_time
@@ -165,10 +165,8 @@ class BaseModel:
 
                 # Checkpoint to save model while training
                 if epoch % checkpoint_interval == 0 or epoch == self.epochs - 1:
-                    instance_path = os.path.join(path_to_save, f'checkpoint_instance_{model_ID}.pk')
-                    with open(instance_path, 'wb') as f:
-                        pk.dump(self, f)  # Save the entire instance
-                    logger.info(f'Checkpoint saved at {instance_path}')
+                    self.save_checkpoint(path_to_save, model_type, model_ID, model_ddp)
+
 
         # Calculate and print the total training time
         total_training_time = time.time() - training_start_time
@@ -200,6 +198,33 @@ class BaseModel:
                 val_loss += loss.item() * inputs.size(0)
         return val_loss / len(val_loader.dataset)
 
+
+    def save_checkpoint(self, path_to_save, model_type, model_ID, model_ddp, **kwargs):
+
+        path_to_attrs = os.path.join(path_to_save, f'attrs{model_ID}.pk')
+        attrs = {
+            'input_size': self.input_size,
+            'output_size': self.output_size,
+            'hidden_layers': self.hidden_layers,
+            'tr_loss': self.tr_loss,
+            'val_loss': self.val_loss,
+            'optimizer': self.optimizer,
+            'loss_function': self.loss_function,
+            'batch_size': self.batch_size,
+            'best_val_loss': self.best_val_loss
+        }
+
+        for key, value in kwargs.items():
+            attrs[key] = value
+
+        with open(path_to_attrs, 'wb') as f:
+            pk.dump(attrs, f)
+
+        path_to_model = os.path.join(path_to_save, f"{model_type}{model_ID}.pth")
+        torch.save(model_ddp.state_dict(), path_to_model)
+        logger.info(f'Checkpoint saved at {path_to_save}')
+
+
     def save_model(self, path_to_save, model_type, model_ID, **kwargs):
         """Save the best model weights."""
         if self.best_model_wts is not None:
@@ -216,7 +241,7 @@ class BaseModel:
                 'input_size': self.input_size,
                 'output_size': self.output_size,
                 'hidden_layers': self.hidden_layers,
-                'history': (self.training_loss, self.val_loss),
+                'history': (self.tr_loss, self.val_loss),
             }
 
             # Add additional attributes from kwargs
@@ -227,7 +252,8 @@ class BaseModel:
             with open(attrs_path, 'wb') as f:
                 pk.dump(attrs, f)
 
-    def predict(self, inputs, proc_index):
+
+    def predict(self, inputs, proc_index): # What is the point of this? should be used when performing prediction on validation set
         """Run inference."""
         self.model.eval()
         predictions = []
@@ -237,22 +263,4 @@ class BaseModel:
                 predictions.append(self.model(batch))
         return torch.cat(predictions, dim=0)
 
-    @staticmethod
-    def continue_training(nprocs, path_to_save, model_type, model_ID, epochs,
-                          train_f: Tensor,
-                          train_l: Tensor,
-                          val_f: Tensor,
-                          val_l: Tensor):
-        instance_path = os.path.join(path_to_save, f"checkpoint_instance_{model_ID}.pk")
-        with open(instance_path, 'rb') as f:
-            loaded_instance = pk.load(f)
 
-        # Move to appropriate device
-        loaded_instance.model = loaded_instance.model.to('cpu')
-        loaded_instance.epochs = epochs
-
-        mp.spawn(
-            loaded_instance.fit,
-            args=(nprocs, path_to_save, model_type, model_ID, train_f, train_l, val_f, val_l),
-            nprocs=nprocs,
-            join=True)

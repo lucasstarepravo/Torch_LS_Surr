@@ -7,7 +7,7 @@ def plot_training_pytorch(history, window_size=10, plot_original=False, save=Fal
     plt.style.use('seaborn-v0_8-paper')
 
     try:
-        training_losses = history.training_loss
+        training_losses = history.tr_loss
         validation_losses = history.val_loss
     except AttributeError:
         training_losses, validation_losses = history['history']
