@@ -20,13 +20,10 @@ def continue_training(nprocs, path_to_save, model_type, model_ID, epochs,
     with open(attr_path, 'rb') as f:
         attrs = pk.load(f)
 
-    state_path = os.path.join(path_to_save, f"checkpoint_{model_type}{model_ID}.pth")
-    model_state = torch.load(state_path, map_location=torch.device('cpu'))
-
     if model_type.lower() == 'ann':
         model_instance = BaseModel(
             hidden_layers=attrs['hidden_layers'],
-            optimizer=attrs['optimizer'],
+            optimizer=attrs['optimizer_str'],
             loss_function=attrs['loss_function'],
             epochs=epochs,
             batch_size=attrs['batch_size'],
@@ -38,7 +35,7 @@ def continue_training(nprocs, path_to_save, model_type, model_ID, epochs,
             alpha=attrs['alpha'],
             moments_order=attrs['moments_order'],
             hidden_layers=attrs['hidden_layers'],
-            optimizer=attrs['optimizer'],
+            optimizer=attrs['optimizer_str'],
             loss_function=attrs['loss_function'],
             epochs=epochs,
             batch_size=attrs['batch_size'],
@@ -49,7 +46,7 @@ def continue_training(nprocs, path_to_save, model_type, model_ID, epochs,
         model_instance = ResNet(
             skip_connections=attrs['skip_connections'],
             hidden_layers=attrs['hidden_layers'],
-            optimizer=attrs['optimizer'],
+            optimizer=attrs['optimizer_str'],
             loss_function=attrs['loss_function'],
             epochs=epochs,
             batch_size=attrs['batch_size'],
@@ -63,6 +60,13 @@ def continue_training(nprocs, path_to_save, model_type, model_ID, epochs,
     model_instance.val_loss = attrs['val_loss']
     model_instance.best_val_loss = attrs['best_val_loss']
 
+    # load optimizer state
+    optimizer_state = attrs['optimizer']
+    model_instance.optimizer.load_state_dict(optimizer_state)
+
+    # load checkpoint weights state
+    state_path = os.path.join(path_to_save, f"checkpoint_{model_type}{model_ID}.pth")
+    model_state = torch.load(state_path, map_location=torch.device('cpu'))
     consume_prefix_in_state_dict_if_present(model_state, prefix="module.")
     model_instance.model.load_state_dict(model_state)
     model_instance.best_model_wts = model_state
