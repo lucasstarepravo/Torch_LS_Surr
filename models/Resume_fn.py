@@ -16,11 +16,11 @@ def continue_training(nprocs, path_to_save, model_type, model_ID, epochs,
                       val_f: Tensor,
                       val_l: Tensor):
 
-    attr_path = os.path.join(path_to_save, f'attrs{model_ID}.pk')
+    attr_path = os.path.join(path_to_save, f'checkpoint_attrs{model_ID}.pk')
     with open(attr_path, 'rb') as f:
         attrs = pk.load(f)
 
-    state_path = os.path.join(path_to_save, f"checkpoint_instance_{model_ID}.pk")
+    state_path = os.path.join(path_to_save, f"checkpoint_{model_type}{model_ID}.pk")
     model_state = torch.load(state_path, map_location=torch.device('cpu'))
 
     if model_type.lower() == 'ann':

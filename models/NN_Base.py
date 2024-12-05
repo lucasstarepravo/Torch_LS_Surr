@@ -201,7 +201,7 @@ class BaseModel:
 
     def save_checkpoint(self, path_to_save, model_type, model_ID, model_ddp, **kwargs):
 
-        path_to_attrs = os.path.join(path_to_save, f'attrs{model_ID}.pk')
+        path_to_attrs = os.path.join(path_to_save, f'checkpoint_attrs{model_ID}.pk')
         attrs = {
             'input_size': self.input_size,
             'output_size': self.output_size,
@@ -220,7 +220,7 @@ class BaseModel:
         with open(path_to_attrs, 'wb') as f:
             pk.dump(attrs, f)
 
-        path_to_model = os.path.join(path_to_save, f"{model_type}{model_ID}.pth")
+        path_to_model = os.path.join(path_to_save, f"checkpoint_{model_type}{model_ID}.pth")
         torch.save(model_ddp.state_dict(), path_to_model)
         logger.info(f'Checkpoint saved at {path_to_save}')
 
