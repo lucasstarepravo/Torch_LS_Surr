@@ -81,6 +81,7 @@ class BaseModel:
         self.model = NN_Topology(self.input_size, hidden_layers, self.output_size)
 
         # Define model and optimization
+        self.optimizer_str = optimizer
         self.optimizer = self.define_optimizer(optimizer)
         self.loss_function = define_loss(loss_function)
 
@@ -93,9 +94,9 @@ class BaseModel:
 
     def define_optimizer(self, optimizer):
         if isinstance(optimizer, str):
-            if optimizer == 'adam':
+            if optimizer.lower() == 'adam':
                 return torch.optim.Adam(self.model.parameters())
-            elif optimizer == 'sgd':
+            elif optimizer.lower() == 'sgd':
                 return torch.optim.SGD(self.model.parameters(), lr=0.01, momentum=0.9)
             else:
                 raise ValueError(f"Unsupported optimizer: {optimizer}")
@@ -209,6 +210,7 @@ class BaseModel:
             'tr_loss': self.tr_loss,
             'val_loss': self.val_loss,
             'optimizer': self.optimizer,
+            'optimizer_str': self.optimizer_str,
             'loss_function': self.loss_function,
             'batch_size': self.batch_size,
             'best_val_loss': self.best_val_loss
@@ -220,6 +222,12 @@ class BaseModel:
                 attrs[key] = value.cpu()
             else:
                 attrs[key] = value
+
+        # Move optimizer state to CPU if it contains tensors
+        for key, state in attrs['optimizer']['state'].items():
+            for sub_key, tensor in state.items():
+                if isinstance(tensor, torch.Tensor):
+                    attrs['optimizer']['state'][key][sub_key] = tensor.cpu()
 
         with open(path_to_attrs, 'wb') as f:
             pk.dump(attrs, f)
