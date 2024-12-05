@@ -214,8 +214,12 @@ class BaseModel:
             'best_val_loss': self.best_val_loss
         }
 
+        # Include kwargs, ensuring all tensors are moved to CPU
         for key, value in kwargs.items():
-            attrs[key] = value
+            if isinstance(value, torch.Tensor):  # Move tensors to CPU
+                attrs[key] = value.cpu()
+            else:
+                attrs[key] = value
 
         with open(path_to_attrs, 'wb') as f:
             pk.dump(attrs, f)
