@@ -129,7 +129,7 @@ class BaseModel:
         model_ddp = DDP(self.model, device_ids=[proc_index], output_device=proc_index)
 
         training_start_time = time.time()
-        checkpoint_interval = 1000
+        checkpoint_interval = 5
 
         for epoch in range(self.epochs):
             epoch_start_time = time.time()
