@@ -5,8 +5,6 @@ import torch
 
 def calc_moments_torch(stand_f, pred_l, n):
     """ Calculate right-hand side vector of the linear system with the predicted solution vector """
-    if stand_f.ndim != 3:
-        raise ValueError("stand_f must have 3 dimensions after reshaping.")
     stand_f = stand_f.view(stand_f.shape[0], n, n)
     pred_l = pred_l.unsqueeze(-1)
     moments = torch.matmul(stand_f, pred_l)
