@@ -1,6 +1,7 @@
 import os
-from models.Resume_fn import continue_training
+from models.Resume_fn import initialise_instance
 from data_processing.preprocessing import preprocess_data
+import torch.multiprocessing as mp
 
 if __name__ == '__main__':
     os.environ['MASTER_ADDR'] = 'localhost'
@@ -11,15 +12,22 @@ if __name__ == '__main__':
     polynomial = 2
     path_to_data = '/mnt/iusers01/mace01/w32040lg/mfree_surr/data/Order_2/Noise_0.3/Data2'
 
+    nprocs = 2
+    path_to_save = './data_out'
+    model_type = 'pinn'
+    model_ID = 777
+
     # Preprocess data
-    train_features, train_labels, val_features, val_labels, test_features, test_labels = preprocess_data(
+    train_f, train_l, val_f, val_l, test_features, test_labels = preprocess_data(
         path_to_data, file_details, derivative, polynomial)
-    continue_training(nprocs=2,
+    model_instance = initialise_instance(
                       path_to_save='./data_out',
                       model_type='pinn',
                       model_ID=777,
-                      epochs=12,
-                      train_f=train_features,
-                      train_l=train_labels,
-                      val_f=val_features,
-                      val_l=val_labels)
+                      epochs=12)
+
+    mp.spawn(
+        model_instance.fit,
+        args=(nprocs, path_to_save, model_type, model_ID, train_f, train_l, val_f, val_l, True),
+        nprocs=nprocs,
+        join=True)
