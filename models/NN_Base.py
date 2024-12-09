@@ -206,12 +206,24 @@ class BaseModel:
 
     def save_checkpoint(self, path_to_save, model_type, model_ID, model_ddp, **kwargs):
 
-        # Move optimizer state to CPU if it contains tensors
+        # Copy the optimizer state
         optimizer_state = self.optimizer.state_dict().copy()
+
+        # Temporary storage for updated states
+        updated_state = {}
+
         for key, state in optimizer_state['state'].items():
+            new_state = {}
             for sub_key, tensor in state.items():
                 if isinstance(tensor, torch.Tensor):
-                    optimizer_state['state'][key][sub_key] = tensor.detach().cpu()
+                    # Safely detach and move the tensor to CPU
+                    new_state[sub_key] = tensor.detach().cpu()
+                else:
+                    new_state[sub_key] = tensor
+            updated_state[key] = new_state
+
+        # Replace the original state with the updated state
+        optimizer_state['state'] = updated_state
 
         path_to_attrs = os.path.join(path_to_save, f'checkpoint_attrs{model_ID}.pk')
         attrs = {
