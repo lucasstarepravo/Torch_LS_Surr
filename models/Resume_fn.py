@@ -73,6 +73,6 @@ def continue_training(nprocs, path_to_save, model_type, model_ID, epochs,
 
     mp.spawn(
         model_instance.fit,
-        args=(nprocs, path_to_save, model_type, model_ID, train_f, train_l, val_f, val_l),
+        args=(nprocs, path_to_save, model_type, model_ID, train_f, train_l, val_f, val_l, True),
         nprocs=nprocs,
         join=True)

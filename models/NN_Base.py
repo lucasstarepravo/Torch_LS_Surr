@@ -86,8 +86,6 @@ class BaseModel:
         self.optimizer = self.define_optimizer(self.optimizer_str)
         self.loss_function = define_loss(self.loss_function_str)
 
-
-
         # Training and validation history
         self.best_model_wts = None
         self.tr_loss = []
@@ -110,7 +108,8 @@ class BaseModel:
             train_f: Tensor,
             train_l: Tensor,
             val_f: Tensor,
-            val_l: Tensor):
+            val_l: Tensor,
+            resume_training):
         """Train the model using Distributed Data Parallel (DDP)."""
         # Initialize DDP
         dist.init_process_group(backend='nccl', world_size=nprocs, rank=proc_index)
@@ -130,6 +129,12 @@ class BaseModel:
                                                  sampler=val_sampler, num_workers=4)
 
         self.model = self.model.to(proc_index)
+
+        if resume_training:
+            for state in self.optimizer.state.values():
+                for key, val in state.items():
+                    if isinstance(val, torch.Tensor):
+                        state[key] = val.to(proc_index)
 
         model_ddp = DDP(self.model, device_ids=[proc_index], output_device=proc_index)
 
