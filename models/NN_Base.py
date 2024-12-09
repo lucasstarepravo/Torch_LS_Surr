@@ -83,6 +83,8 @@ class BaseModel:
         # Define model and optimization
         self.optimizer_str = optimizer
         self.loss_function_str = loss_function
+        self.optimizer = self.define_optimizer(self.optimizer_str)
+        self.loss_function = define_loss(self.loss_function_str)
 
 
 
@@ -128,8 +130,6 @@ class BaseModel:
                                                  sampler=val_sampler, num_workers=4)
 
         self.model = self.model.to(proc_index)
-        self.optimizer = self.define_optimizer(self.optimizer_str)
-        self.loss_function = define_loss(self.loss_function_str)
 
         model_ddp = DDP(self.model, device_ids=[proc_index], output_device=proc_index)
 
