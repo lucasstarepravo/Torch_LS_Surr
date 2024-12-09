@@ -130,13 +130,13 @@ class BaseModel:
 
         self.model = self.model.to(proc_index)
 
+        model_ddp = DDP(self.model, device_ids=[proc_index], output_device=proc_index)
+
         if resume_training:
             for state in self.optimizer.state.values():
                 for key, val in state.items():
                     if isinstance(val, torch.Tensor):
                         state[key] = val.to(proc_index)
-
-        model_ddp = DDP(self.model, device_ids=[proc_index], output_device=proc_index)
 
         training_start_time = time.time()
         checkpoint_interval = 5

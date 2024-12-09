@@ -16,9 +16,9 @@ if __name__ == '__main__':
         path_to_data, file_details, derivative, polynomial)
     continue_training(nprocs=2,
                       path_to_save='./data_out',
-                      model_type='ann',
-                      model_ID=70,
-                      epochs=10000,
+                      model_type='pinn',
+                      model_ID=777,
+                      epochs=12,
                       train_f=train_features,
                       train_l=train_labels,
                       val_f=val_features,
