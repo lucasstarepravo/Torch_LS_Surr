@@ -112,6 +112,7 @@ class BaseModel:
             resume_training):
         """Train the model using Distributed Data Parallel (DDP)."""
         # Initialize DDP
+        logger.info(f'Initialising GPU {proc_index}')
         dist.init_process_group(backend='nccl', world_size=nprocs, rank=proc_index)
         torch.cuda.set_device(proc_index)
 
