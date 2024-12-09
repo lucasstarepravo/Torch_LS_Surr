@@ -82,8 +82,9 @@ class BaseModel:
 
         # Define model and optimization
         self.optimizer_str = optimizer
-        self.optimizer = self.define_optimizer(optimizer)
-        self.loss_function = define_loss(loss_function)
+        self.loss_function_str = loss_function
+
+
 
         # Training and validation history
         self.best_model_wts = None
@@ -127,6 +128,9 @@ class BaseModel:
                                                  sampler=val_sampler, num_workers=4)
 
         self.model = self.model.to(proc_index)
+        self.optimizer = self.define_optimizer(self.optimizer_str)
+        self.loss_function = define_loss(self.loss_function_str)
+
         model_ddp = DDP(self.model, device_ids=[proc_index], output_device=proc_index)
 
         training_start_time = time.time()
@@ -203,7 +207,7 @@ class BaseModel:
     def save_checkpoint(self, path_to_save, model_type, model_ID, model_ddp, **kwargs):
 
         # Move optimizer state to CPU if it contains tensors
-        optimizer_state = self.optimizer.state_dict()
+        optimizer_state = self.optimizer.state_dict().copy()
         for key, state in optimizer_state['state'].items():
             for sub_key, tensor in state.items():
                 if isinstance(tensor, torch.Tensor):
