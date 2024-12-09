@@ -202,6 +202,13 @@ class BaseModel:
 
     def save_checkpoint(self, path_to_save, model_type, model_ID, model_ddp, **kwargs):
 
+        # Move optimizer state to CPU if it contains tensors
+        optimizer_state = self.optimizer.state_dict()
+        for key, state in optimizer_state['state'].items():
+            for sub_key, tensor in state.items():
+                if isinstance(tensor, torch.Tensor):
+                    optimizer_state['state'][key][sub_key] = tensor.cpu()
+
         path_to_attrs = os.path.join(path_to_save, f'checkpoint_attrs{model_ID}.pk')
         attrs = {
             'input_size': self.input_size,
@@ -209,7 +216,7 @@ class BaseModel:
             'hidden_layers': self.hidden_layers,
             'tr_loss': self.tr_loss,
             'val_loss': self.val_loss,
-            'optimizer': self.optimizer,
+            'optimizer': optimizer_state,
             'optimizer_str': self.optimizer_str,
             'loss_function': self.loss_function,
             'batch_size': self.batch_size,
@@ -222,12 +229,6 @@ class BaseModel:
                 attrs[key] = value.cpu()
             else:
                 attrs[key] = value
-
-        # Move optimizer state to CPU if it contains tensors
-        for key, state in attrs['optimizer']['state'].items():
-            for sub_key, tensor in state.items():
-                if isinstance(tensor, torch.Tensor):
-                    attrs['optimizer']['state'][key][sub_key] = tensor.cpu()
 
         with open(path_to_attrs, 'wb') as f:
             pk.dump(attrs, f)
