@@ -5,16 +5,11 @@ from models.PINN import PINN
 import torch
 from torch import Tensor
 import pickle as pk
-import torch.multiprocessing as mp
 from torch.nn.modules.utils import consume_prefix_in_state_dict_if_present
 
 
 
-def continue_training(nprocs, path_to_save, model_type, model_ID, epochs,
-                      train_f: Tensor,
-                      train_l: Tensor,
-                      val_f: Tensor,
-                      val_l: Tensor):
+def initialise_instance(path_to_save, model_type, model_ID, epochs):
 
     attr_path = os.path.join(path_to_save, f'checkpoint_attrs{model_ID}.pk')
     with open(attr_path, 'rb') as f:
@@ -71,8 +66,4 @@ def continue_training(nprocs, path_to_save, model_type, model_ID, epochs,
     model_instance.model.load_state_dict(model_state)
     model_instance.best_model_wts = model_state
 
-    mp.spawn(
-        model_instance.fit,
-        args=(nprocs, path_to_save, model_type, model_ID, train_f, train_l, val_f, val_l, True),
-        nprocs=nprocs,
-        join=True)
+    return model_instance
