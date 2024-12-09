@@ -211,7 +211,8 @@ class BaseModel:
         for key, state in optimizer_state['state'].items():
             for sub_key, tensor in state.items():
                 if isinstance(tensor, torch.Tensor):
-                    optimizer_state['state'][key][sub_key] = tensor.cpu()
+                    pass
+                    #optimizer_state['state'][key][sub_key] = tensor.cpu()
 
         path_to_attrs = os.path.join(path_to_save, f'checkpoint_attrs{model_ID}.pk')
         attrs = {
