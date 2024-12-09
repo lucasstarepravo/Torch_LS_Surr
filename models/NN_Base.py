@@ -92,6 +92,8 @@ class BaseModel:
         self.val_loss = []
         self.best_val_loss = float('inf')
 
+        self._checkpoint_index = 0
+
 
     def define_optimizer(self, optimizer):
         if isinstance(optimizer, str):
@@ -111,6 +113,7 @@ class BaseModel:
             val_l: Tensor,
             resume_training):
         """Train the model using Distributed Data Parallel (DDP)."""
+        logger.info(f'Initialising GPU {proc_index}')
         # Initialize DDP
         logger.info(f'Initialising GPU {proc_index}')
         dist.init_process_group(backend='nccl', world_size=nprocs, rank=proc_index)
@@ -139,8 +142,10 @@ class BaseModel:
                     if isinstance(val, torch.Tensor):
                         state[key] = val.to(proc_index)
 
-        training_start_time = time.time()
+
         checkpoint_interval = 5
+
+        training_start_time = time.time()
 
         for epoch in range(self.epochs):
             epoch_start_time = time.time()
@@ -174,7 +179,7 @@ class BaseModel:
                 print(f"Epoch {epoch + 1}/{self.epochs} - Loss: {avg_training_loss:.4e}, "
                       f"Validation Loss: {val_loss:.4e}, Time: {epoch_time:.2f}s")
 
-                # Checkpoint to save model while training
+                # Checkpoint to save model while training or if on last epoch
                 if epoch % checkpoint_interval == 0 or epoch == self.epochs - 1:
                     self.save_checkpoint(path_to_save, model_type, model_ID, model_ddp)
 
@@ -257,7 +262,8 @@ class BaseModel:
 
         path_to_model = os.path.join(path_to_save, f"checkpoint_{model_type}{model_ID}.pth")
         torch.save(model_ddp.state_dict(), path_to_model)
-        logger.info(f'Checkpoint saved at {path_to_save}')
+        logger.info(f'Checkpoint {self._checkpoint_index} saved at {path_to_save}')
+        self._checkpoint_index += 1
 
 
     def save_model(self, path_to_save, model_type, model_ID, **kwargs):
