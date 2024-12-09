@@ -111,6 +111,7 @@ class BaseModel:
             val_l: Tensor,
             resume_training):
         """Train the model using Distributed Data Parallel (DDP)."""
+        logger.info(f'Initialising GPU {proc_index}')
         # Initialize DDP
         dist.init_process_group(backend='nccl', world_size=nprocs, rank=proc_index)
         torch.cuda.set_device(proc_index)
@@ -173,7 +174,7 @@ class BaseModel:
                 print(f"Epoch {epoch + 1}/{self.epochs} - Loss: {avg_training_loss:.4e}, "
                       f"Validation Loss: {val_loss:.4e}, Time: {epoch_time:.2f}s")
 
-                # Checkpoint to save model while training
+                # Checkpoint to save model while training or if on last epoch
                 if epoch % checkpoint_interval == 0 or epoch == self.epochs - 1:
                     self.save_checkpoint(path_to_save, model_type, model_ID, model_ddp)
 
