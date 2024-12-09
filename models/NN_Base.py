@@ -92,6 +92,8 @@ class BaseModel:
         self.val_loss = []
         self.best_val_loss = float('inf')
 
+        self._checkpoint_index = 0
+
 
     def define_optimizer(self, optimizer):
         if isinstance(optimizer, str):
@@ -139,8 +141,10 @@ class BaseModel:
                     if isinstance(val, torch.Tensor):
                         state[key] = val.to(proc_index)
 
-        training_start_time = time.time()
+
         checkpoint_interval = 5
+
+        training_start_time = time.time()
 
         for epoch in range(self.epochs):
             epoch_start_time = time.time()
@@ -257,7 +261,8 @@ class BaseModel:
 
         path_to_model = os.path.join(path_to_save, f"checkpoint_{model_type}{model_ID}.pth")
         torch.save(model_ddp.state_dict(), path_to_model)
-        logger.info(f'Checkpoint saved at {path_to_save}')
+        logger.info(f'Checkpoint {self._checkpoint_index} saved at {path_to_save}')
+        self._checkpoint_index += 1
 
 
     def save_model(self, path_to_save, model_type, model_ID, **kwargs):
