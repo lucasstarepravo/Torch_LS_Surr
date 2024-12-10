@@ -1,6 +1,10 @@
 import torch.nn as nn
 from torch import Tensor
 from models.NN_Base import BaseModel
+import logging
+
+logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+logger = logging.getLogger(__name__)
 
 
 class ResNet_Topology(nn.Module):
@@ -29,6 +33,7 @@ class ResNet_Topology(nn.Module):
         self.layers = nn.ModuleList(layers)
 
     def forward(self, input):
+        logger.info('Using ResNet forward propagation')
         resblock_output = {}
         for i, layer in enumerate(self.layers):
             res_block = [(index, tup) for index, tup in enumerate(self.scaled_skip_connection)
