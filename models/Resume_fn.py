@@ -55,9 +55,8 @@ def initialise_instance(path_to_save, model_type, model_ID, epochs):
     model_instance.val_loss = attrs['val_loss']
     model_instance.best_val_loss = attrs['best_val_loss']
 
-    # load optimizer state
-    optimizer_state = attrs['optimizer']
-    model_instance.optimizer.load_state_dict(optimizer_state)
+    # extract optimiser state
+    optimizer_state = attrs['optimizer_state']
 
     # load checkpoint weights state
     state_path = os.path.join(path_to_save, f"checkpoint_{model_type}{model_ID}.pth")
@@ -66,4 +65,4 @@ def initialise_instance(path_to_save, model_type, model_ID, epochs):
     model_instance.model.load_state_dict(model_state)
     model_instance.best_model_wts = model_state
 
-    return model_instance
+    return model_instance, optimizer_state
