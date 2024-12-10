@@ -83,8 +83,7 @@ class BaseModel:
         # Define model and optimization
         self.optimizer_str = optimizer
         self.loss_function_str = loss_function
-        self.optimizer = self.define_optimizer(self.optimizer_str)
-        self.loss_function = define_loss(self.loss_function_str)
+
 
         # Training and validation history
         self.best_model_wts = None
@@ -135,6 +134,8 @@ class BaseModel:
         self.model = self.model.to(proc_index)
 
         model_ddp = DDP(self.model, device_ids=[proc_index], output_device=proc_index)
+        self.optimizer = self.define_optimizer(self.optimizer_str)
+        self.loss_function = define_loss(self.loss_function_str)
 
         if resume_training:
             for state in self.optimizer.state.values():
