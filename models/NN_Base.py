@@ -110,7 +110,7 @@ class BaseModel:
             train_l: Tensor,
             val_f: Tensor,
             val_l: Tensor,
-            resume_training):
+            old_optimiser_state):
         """Train the model using Distributed Data Parallel (DDP)."""
         logger.info(f'Initialising GPU {proc_index}')
         # Initialize DDP
@@ -130,18 +130,19 @@ class BaseModel:
         val_loader = torch.utils.data.DataLoader(val_tensor, batch_size=self.batch_size,
                                                  sampler=val_sampler, num_workers=4)
 
+        # Moving model to GPU and initialising DDP
         self.model = self.model.to(proc_index)
-
         model_ddp = DDP(self.model, device_ids=[proc_index], output_device=proc_index)
+
         self.optimizer = self.define_optimizer(self.optimizer_str)
         self.loss_function = define_loss(self.loss_function_str)
 
-        if resume_training:
+        if old_optimiser_state is not None:
+            self.optimizer.load_state_dict(old_optimiser_state)
             for state in self.optimizer.state.values():
                 for key, val in state.items():
                     if isinstance(val, torch.Tensor):
                         state[key] = val.to(proc_index)
-
 
         checkpoint_interval = 5
 
@@ -243,7 +244,7 @@ class BaseModel:
             'hidden_layers': self.hidden_layers,
             'tr_loss': self.tr_loss,
             'val_loss': self.val_loss,
-            'optimizer': optimizer_state,
+            'optimizer_state': optimizer_state,
             'optimizer_str': self.optimizer_str,
             'loss_function': self.loss_function,
             'batch_size': self.batch_size,
@@ -303,5 +304,4 @@ class BaseModel:
                 batch = inputs[i:i + self.batch_size].to(proc_index)
                 predictions.append(self.model(batch))
         return torch.cat(predictions, dim=0)
-
 

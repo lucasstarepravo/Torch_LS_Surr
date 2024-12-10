@@ -32,26 +32,24 @@ def run_model(path_to_data, layers, model_ID, nprocs, model_type, file_details, 
 
     skip_connections = [(0, 9)]
 
-    ann = PINN(hidden_layers=layers,
-               optimizer='adam',
-               loss_function='MSE',
-               epochs=13,
-               batch_size=128,
-               train_f=train_features,
-               train_l=train_labels,
-               moments_order=polynomial,
-               alpha=0.5)
+    ann = ResNet(hidden_layers=layers,
+                 optimizer='adam',
+                 loss_function='MSE',
+                 epochs=13,
+                 batch_size=128,
+                 train_f=train_features,
+                 train_l=train_labels,
+                 skip_connections=skip_connections)
 
     logger.info('Starting model training')
     mp.spawn(ann.fit,
              args=(nprocs, path_to_save, model_type, model_ID,
-                   train_features, train_labels, val_features, val_labels, False),
+                   train_features, train_labels, val_features, val_labels, None),
              nprocs=nprocs)
 
     evaluate_model(test_features, test_labels, polynomial, model_ID, path_to_save, model_type)
 
     logger.info('Model run complete')
-
 
 
 if __name__ == '__main__':

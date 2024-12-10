@@ -16,18 +16,19 @@ if __name__ == '__main__':
     path_to_save = './data_out'
     model_type = 'pinn'
     model_ID = 777
+    epochs = 12
 
     # Preprocess data
     train_f, train_l, val_f, val_l, test_features, test_labels = preprocess_data(
         path_to_data, file_details, derivative, polynomial)
-    model_instance = initialise_instance(
-                      path_to_save='./data_out',
-                      model_type='pinn',
-                      model_ID=777,
-                      epochs=12)
+    model_instance, optimiser_state = initialise_instance(
+                      path_to_save=path_to_save,
+                      model_type=model_type,
+                      model_ID=model_ID,
+                      epochs=epochs)
 
     mp.spawn(
         model_instance.fit,
-        args=(nprocs, path_to_save, model_type, model_ID, train_f, train_l, val_f, val_l, True),
+        args=(nprocs, path_to_save, model_type, model_ID, train_f, train_l, val_f, val_l, optimiser_state),
         nprocs=nprocs,
         join=True)
