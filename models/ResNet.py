@@ -16,6 +16,8 @@ class ResNet_Topology(nn.Module):
         self.skip_connections = skip_connections
 
         self.skip_connections = self.skip_connections if self.skip_connections else []
+
+        # A scaled skip connection is required due to the nomalisation layer added
         self.scaled_skip_connection = [(x * 2 + 1, y * 2 + 1) for x, y in self.skip_connections]
 
         layers = [nn.Linear(self.input_size, self.hidden_layers[0])]
@@ -32,6 +34,26 @@ class ResNet_Topology(nn.Module):
 
         self.layers = nn.ModuleList(layers)
 
+    def forward(self, x):
+        outputs = []
+
+        for i, layer in enumerate(self.layers):
+            if isinstance(layer, nn.Linear):
+                x = layer(x)
+
+            elif isinstance(layer, nn.LayerNorm):
+                x = layer(x)
+                outputs.append(x)  # Store the output after normalization for potential skip connections
+
+            elif isinstance(layer, nn.SiLU):
+                x = layer(x)
+
+            # Apply skip connections
+            for skip_in, skip_out in self.scaled_skip_connection:
+                if i == skip_out:
+                    x = x + outputs[skip_in]  # Add skip connection output after normalization
+
+        return x
     def forward(self, input):
         resblock_output = {}
         for i, layer in enumerate(self.layers):
