@@ -145,7 +145,7 @@ class BaseModel:
                     if isinstance(val, torch.Tensor):
                         state[key] = val.to(proc_index)
 
-        checkpoint_interval = 5
+        checkpoint_interval = 1000
 
         training_start_time = time.time()
 
