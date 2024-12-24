@@ -17,7 +17,8 @@ class ResNet_Topology(nn.Module):
 
         self.skip_connections = self.skip_connections if self.skip_connections else []
 
-        # A scaled skip connection is required due to the nomalisation layer added
+        # A scaled skip connection is required due to the normalisation layer added
+        # The output of the normalised layer is connected to another normalisation layer
         self.scaled_skip_connection = [(x * 2 + 1, y * 2 + 1) for x, y in self.skip_connections]
 
         layers = [nn.Linear(self.input_size, self.hidden_layers[0])]
@@ -35,7 +36,7 @@ class ResNet_Topology(nn.Module):
         self.layers = nn.ModuleList(layers)
 
     def forward(self, x):
-        outputs = []
+        outputs = {}
 
         for i, layer in enumerate(self.layers):
             if isinstance(layer, nn.Linear):
@@ -43,7 +44,7 @@ class ResNet_Topology(nn.Module):
 
             elif isinstance(layer, nn.LayerNorm):
                 x = layer(x)
-                outputs.append(x)  # Store the output after normalization for potential skip connections
+                outputs[i] = x  # Store the output after normalization for potential skip connections
 
             elif isinstance(layer, nn.SiLU):
                 x = layer(x)
@@ -54,23 +55,6 @@ class ResNet_Topology(nn.Module):
                     x = x + outputs[skip_in]  # Add skip connection output after normalization
 
         return x
-    def forward(self, input):
-        resblock_output = {}
-        for i, layer in enumerate(self.layers):
-            res_block = [(index, tup) for index, tup in enumerate(self.scaled_skip_connection)
-                         if i in tup]  # This checks if the current layer is supposed to be a residual block
-            # For now, this code only works with unique receiving and sending block layers
-            # (a layer cannot receive to past outputs, or receive and send the output through the same layer)
-            if res_block:
-                if i == res_block[0][1][0]:  # This checks if this is the start or finish of residual block
-                    input = layer(input)
-                    resblock_output[res_block[0][1][1]] = input
-                else:
-                    input = layer(input)
-                    input = input + resblock_output[i]
-            else:
-                input = layer(input)
-        return input
 
 
 
