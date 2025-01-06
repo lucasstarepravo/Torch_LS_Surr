@@ -17,7 +17,7 @@ class ResNet_Topology(nn.Module):
         self.skip_connections = skip_connections if skip_connections else []
 
         # Scaled skip connection indices
-        self.scaled_skip_connection = [(x * 2 + 1, y * 2 + 1) for x, y in self.skip_connections]
+        self.scaled_skip_connection = [(x * 3 + 1, y * 3 + 1) for x, y in self.skip_connections]
 
         for skip_in, skip_out in skip_connections:
             if skip_in < 0 or skip_in > len(hidden_layers) or skip_out < 0 or skip_out > len(hidden_layers):
