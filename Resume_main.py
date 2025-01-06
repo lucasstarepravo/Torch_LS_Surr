@@ -2,6 +2,11 @@ import os
 from models.Resume_fn import initialise_instance
 from data_processing.preprocessing import preprocess_data
 import torch.multiprocessing as mp
+from data_processing.postprocessing import evaluate_model
+import logging
+
+logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+logger = logging.getLogger(__name__)
 
 if __name__ == '__main__':
     os.environ['MASTER_ADDR'] = 'localhost'
@@ -32,3 +37,7 @@ if __name__ == '__main__':
         args=(nprocs, path_to_save, model_type, model_ID, train_f, train_l, val_f, val_l, optimiser_state),
         nprocs=nprocs,
         join=True)
+
+    evaluate_model(test_features, test_labels, polynomial, model_ID, path_to_save, model_type)
+
+    logger.info('Model run complete')
