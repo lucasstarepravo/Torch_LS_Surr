@@ -54,7 +54,11 @@ class ResNet_Topology(nn.Module):
             # Apply skip connections dynamically
             for skip_in, skip_out in self.scaled_skip_connection:
                 if i == skip_out:
-                    x = x + outputs[skip_in]  # Directly add the skip connection output
+                    if skip_in in outputs:
+                        x = x + outputs[skip_in]  # Add skip connection output
+                    else:
+                        logger.warning(
+                            f"Skip connection from {skip_in} to {skip_out} cannot be applied. Key {skip_in} missing.")
 
         return x
 
