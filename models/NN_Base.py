@@ -8,6 +8,7 @@ from torch.utils.data import DataLoader, TensorDataset
 from torch.nn.parallel import DistributedDataParallel as DDP
 from torch import Tensor
 import pickle as pk
+from data_processing.postprocessing import evaluate_model
 
 # Logging setup
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
@@ -105,12 +106,20 @@ class BaseModel:
         else:
             return optimizer
 
-    def fit(self, proc_index, nprocs, path_to_save, model_type, model_ID,
+    def fit(self,
+            proc_index,
+            nprocs,
+            path_to_save,
+            model_type,
+            model_ID,
             train_f: Tensor,
             train_l: Tensor,
             val_f: Tensor,
             val_l: Tensor,
-            old_optimiser_state):
+            old_optimiser_state,
+            test_f,
+            test_l,
+            polynomial):
         """Train the model using Distributed Data Parallel (DDP)."""
         logger.info(f'Initialising GPU {proc_index}')
         # Initialize DDP
@@ -144,7 +153,7 @@ class BaseModel:
                     if isinstance(val, torch.Tensor):
                         state[key] = val.to(proc_index)
 
-        checkpoint_interval = 5
+        checkpoint_interval = 1000
 
         training_start_time = time.time()
 
@@ -183,6 +192,7 @@ class BaseModel:
                 # Checkpoint to save model while training or if on last epoch
                 if epoch % checkpoint_interval == 0 or epoch == self.epochs - 1:
                     self.save_checkpoint(path_to_save, model_type, model_ID, model_ddp)
+                    evaluate_model(test_f, test_l, polynomial, model_ID, path_to_save, model_type)
 
 
         # Calculate and print the total training time
@@ -260,6 +270,7 @@ class BaseModel:
 
         with open(path_to_attrs, 'wb') as f:
             pk.dump(attrs, f)
+
 
         path_to_model = os.path.join(path_to_save, f"checkpoint_{model_type}{model_ID}.pth")
         torch.save(model_ddp.state_dict(), path_to_model)

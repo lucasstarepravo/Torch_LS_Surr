@@ -44,10 +44,9 @@ def run_model(path_to_data, layers, model_ID, nprocs, model_type, file_details, 
     logger.info('Starting model training')
     mp.spawn(ann.fit,
              args=(nprocs, path_to_save, model_type, model_ID,
-                   train_features, train_labels, val_features, val_labels, None),
+                   train_features, train_labels, val_features, val_labels, None,
+                   test_features, test_labels, polynomial),
              nprocs=nprocs)
-
-    evaluate_model(test_features, test_labels, polynomial, model_ID, path_to_save, model_type)
 
     logger.info('Model run complete')
 

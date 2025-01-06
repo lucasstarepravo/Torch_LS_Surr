@@ -34,10 +34,9 @@ if __name__ == '__main__':
 
     mp.spawn(
         model_instance.fit,
-        args=(nprocs, path_to_save, model_type, model_ID, train_f, train_l, val_f, val_l, optimiser_state),
+        args=(nprocs, path_to_save, model_type, model_ID, train_f, train_l, val_f, val_l, optimiser_state,
+              test_features, test_labels, polynomial),
         nprocs=nprocs,
         join=True)
-
-    evaluate_model(test_features, test_labels, polynomial, model_ID, path_to_save, model_type)
 
     logger.info('Model run complete')
