@@ -8,7 +8,7 @@ from torch.utils.data import DataLoader, TensorDataset
 from torch.nn.parallel import DistributedDataParallel as DDP
 from torch import Tensor
 import pickle as pk
-from data_processing.postprocessing import evaluate_model
+
 
 # Logging setup
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
@@ -191,6 +191,7 @@ class BaseModel:
 
                 # Checkpoint to save model while training or if on last epoch
                 if epoch % checkpoint_interval == 0 or epoch == self.epochs - 1:
+                    from data_processing.postprocessing import evaluate_model
                     self.save_checkpoint(path_to_save, model_type, model_ID, model_ddp)
                     evaluate_model(test_f, test_l, polynomial, model_ID, path_to_save, model_type)
 
