@@ -10,7 +10,11 @@ def plot_training_pytorch(history, window_size=10, plot_original=False, save=Fal
         training_losses = history.tr_loss
         validation_losses = history.val_loss
     except AttributeError:
-        training_losses, validation_losses = history['history']
+        try:
+            training_losses = history['tr_loss']
+            validation_losses = history['val_loss']
+        except KeyError:
+            training_losses, validation_losses = history['history']
 
     # Smooth the validation losses using a moving average
     def moving_average(data, size):
