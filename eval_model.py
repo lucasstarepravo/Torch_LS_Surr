@@ -19,6 +19,7 @@ if __name__=='__main__':
     model_ID = 68
     epochs = 0
 
+    logger.info('Loading and preprocessing data')
     # Preprocess data
     train_f, train_l, val_f, val_l, test_features, test_labels = preprocess_data(
         path_to_data, file_details, derivative, polynomial)
