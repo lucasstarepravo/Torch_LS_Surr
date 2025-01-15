@@ -278,6 +278,20 @@ class BaseModel:
         logger.info(f'Checkpoint {self._checkpoint_index} saved at {path_to_save}')
         self._checkpoint_index += 1
 
+        # Below the attributes and model will be saved on another format so evaluate model can access the saved values
+        model_path = os.path.join(path_to_save, f'{model_type}{model_ID}.pth')
+        attrs_save = {
+            'input_size': self.input_size,
+            'output_size': self.output_size,
+            'hidden_layers': self.hidden_layers,
+            'history': (self.tr_loss, self.val_loss)
+        }
+
+        torch.save(model_ddp.state_dict(), model_path)
+        attrs_path = os.path.join(path_to_save, f'attrs{model_ID}.pk')
+        with open(attrs_path, 'wb') as f:
+            pk.dump(attrs_save, f)
+
 
     def save_model(self, path_to_save, model_type, model_ID, **kwargs):
         """Save the best model weights."""
