@@ -9,7 +9,6 @@ Torch_LS_Surr is a PyTorch-based framework for training surrogate models for den
 - [Usage](#usage)
 - [Resuming Training](#resuming-training)
 - [Requirements](#requirements)
-- [Customization](#customization)
 
 ## Features
 
@@ -63,9 +62,3 @@ To resume training from a checkpoint, use the `Resume_main.py` script. Checkpoin
 Python: Version 3.9 or later (tested with Python 3.12)
 PyTorch: Version 2.2.1 (see requirements.txt for the complete list of dependencies)
 
-## Customization
-
-This project is designed to be flexible:
-
-Use the run_model function in main.py to adjust high-level training settings.
-For more advanced modifications, edit the specific low-level parameters in the models folder.
