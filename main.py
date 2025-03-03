@@ -1,5 +1,4 @@
 from data_processing.preprocessing import preprocess_data
-from data_processing.postprocessing import evaluate_model
 from Plots import *
 from models.NN_Base import BaseModel
 from models.PINN import PINN
@@ -32,6 +31,15 @@ def run_model(path_to_data, layers, model_ID, nprocs, model_type, file_details, 
 
     skip_connections = [(0, 9)]
 
+    if model_type.lower() == 'transformers':
+        train_features = train_features.reshape(train_features.shape[0], -1, 5)
+        val_features = val_features.reshape(val_features.shape[0], -1, 5)
+        test_features = test_features.reshape(test_features.shape[0], -1, 5)
+
+        #train_labels = train_labels.unsqueeze(-1)
+        #val_labels = val_labels.unsqueeze(-1)
+        #test_labels = np.expand_dims(test_labels, axis=-1)
+
     ann = ResNet(hidden_layers=layers,
                  optimizer='adam',
                  loss_function='MSE',
@@ -54,10 +62,10 @@ def run_model(path_to_data, layers, model_ID, nprocs, model_type, file_details, 
 if __name__ == '__main__':
     os.environ['MASTER_ADDR'] = 'localhost'
     os.environ['MASTER_PORT'] = '12355'
-    run_model('/mnt/iusers01/mace01/w32040lg/mfree_surr/data/Order_2/Noise_0.3/Data2',
+    run_model(path_to_data='/home/w32040lg/Shape Function Surrogate/Data2',
               layers=7 * [64],
               model_ID='777',
               nprocs=2,
-              model_type='pinn',
-              file_details=[(6, 0.3)],
+              model_type='transformers',
+              file_details=[(7, 0.3)],
               path_to_save='./data_out')
