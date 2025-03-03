@@ -17,14 +17,14 @@ def calc_moments(test_f, test_l, polynomial):
     return moments.squeeze(-1)
 
 
-def save_variable_with_pickle(variable, variable_name, variable_id, filepath):
+def save_variable_with_pickle(variable, variable_name, variable_id, file_path):
     # Ensure the directory exists
-    if not os.path.exists(filepath):
-        os.makedirs(filepath)
+    if not os.path.exists(file_path):
+        os.makedirs(file_path)
 
     # Construct the filename with the ID appended
     file_name = f"{variable_name}{variable_id}.pk"
-    file_path = os.path.join(filepath, file_name)
+    file_path = os.path.join(file_path, file_name)
 
     # Save the variable using pickle
     with open(file_path, 'wb') as f:
@@ -54,8 +54,8 @@ def evaluate_model(test_features,
     """
 
     # Load attributes and evaluate model
-    attrs_path = os.path.join(path_to_save, f'attrs{model_ID}.pk')
-    model_path = os.path.join(path_to_save, f'{model_type}{model_ID}.pth')
+    attrs_path = os.path.join(path_to_save, f'checkpoint_attrs{model_ID}.pk')
+    model_path = os.path.join(path_to_save, f'checkpoint_{model_type}{model_ID}.pth')
     with open(attrs_path, 'rb') as f:
         attrs = pk.load(f)
 
@@ -71,7 +71,7 @@ def evaluate_model(test_features,
     moments_pred = calc_moments(test_features.numpy(), pred_l.detach().numpy(), polynomial=polynomial)
 
     moment_error = np.mean(abs(moments_pred - moments_act), axis=0)
-    moment_std = np.std(abs(moments_pred - moments_act), axis=0)
+    moment_std = np.std((moments_pred - moments_act), axis=0)
 
     logger.info(f"Moment error: {moment_error}")
     logger.info(f"Moment standard deviation: {moment_std}")
