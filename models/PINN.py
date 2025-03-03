@@ -33,6 +33,7 @@ class PINN(BaseModel):
         target_moments = torch.zeros((outputs.shape[0], n), device=outputs.device)
         target_moments[:, 2] = 1
         target_moments[:, 4] = 1
+        #physics_loss = self.loss_function(moments, target_moments)
         physics_loss = (target_moments - moments) ** 2
         return physics_loss.mean(axis=0)
 
