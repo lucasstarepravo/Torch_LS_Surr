@@ -1,6 +1,7 @@
 import torch
 from models.NN_Base import NN_Topology
 from models.ResNet import ResNet_Topology
+from models.Transformer import Transformer_Topology
 from torch.nn.modules.utils import consume_prefix_in_state_dict_if_present
 
 
@@ -29,8 +30,22 @@ def load_model_instance(model_path,
     elif model_type.lower() == 'resnet':
         skip_connections = attrs['skip_connections']
         model_instance = ResNet_Topology(input_size, hidden_layers, output_size, skip_connections)
+    elif model_type.lower() == 'transformer':
+        d_model = attrs['d_model']
+        seq_len = attrs['seq_len']
+        nhead = attrs['nhead']
+        num_layers = attrs['num_layers']
+        dim_feedforward = attrs['dim_feedforward']
+        model_instance = Transformer_Topology(input_size=input_size,
+                                              d_model=d_model,
+                                              nhead=nhead,
+                                              num_layers=num_layers,
+                                              dim_feedforward=dim_feedforward,
+                                              seq_len=seq_len,
+                                              output_size=output_size,
+                                              hidden_layers=hidden_layers)
     else:
-        raise ValueError('model_type must be one of "ann","pinn","resnet"')
+        raise ValueError('model_type must be one of "ann","pinn","resnet", or "transformer"')
 
     # Automatically remove the "module." prefix if it exists
     consume_prefix_in_state_dict_if_present(model_state, prefix="module.")
