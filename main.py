@@ -3,6 +3,7 @@ from Plots import *
 from models.NN_Base import BaseModel
 from models.PINN import PINN
 from models.ResNet import ResNet
+from models.Transformer import Transformer
 import pickle as pk
 import os
 import logging
@@ -48,6 +49,18 @@ def run_model(path_to_data, layers, model_ID, nprocs, model_type, file_details, 
                  train_f=train_features,
                  train_l=train_labels,
                  skip_connections=skip_connections)
+
+    ann = Transformer(hidden_layers=None,
+                      optimizer='adam',
+                      loss_function='MSE',
+                      epochs=13,
+                      batch_size=128,
+                      train_f=train_features,
+                      train_l=train_labels,
+                      d_model=4,
+                      nhead=4,
+                      num_layers=8,
+                      dim_feedforward=64)
 
     logger.info('Starting model training')
     mp.spawn(ann.fit,
