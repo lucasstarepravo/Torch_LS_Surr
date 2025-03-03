@@ -56,7 +56,7 @@ def import_stored_data(base_path, file, order, noise):
     return amat, psi, h[:-1]  # Remove last element for Fortran hovdx variable
 
 
-def preprocess_data(path_to_data, file_details, derivative, polynomial, tt_split=0.9, seed=1):
+def preprocess_data(path_to_data, file_details, derivative, polynomial=1, tt_split=0.9, seed=1):
     """
     Preprocess data: import, standardize, split into train, validation, and test sets.
 
