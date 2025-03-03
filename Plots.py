@@ -2,8 +2,8 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 
-def plot_training_pytorch(history, window_size=10, plot_original=False, save=False, show_legend=True, log_y=False,
-                          title=False, plot_smooth=False):
+def plot_training_pytorch(history, window_size=10, plot_original=False, save=False, show_legend=True,
+                          log_y=False, log_x=False, title=False, plot_smooth=False):
     plt.style.use('seaborn-v0_8-paper')
 
     try:
@@ -36,7 +36,7 @@ def plot_training_pytorch(history, window_size=10, plot_original=False, save=Fal
     if plot_smooth:
         ax.plot(epochs, smoothed_validation_losses, linestyle='-', color='g', alpha=0.5, label='Validation Loss (Smoothed)', linewidth=2)
 
-    if title==False:
+    if title == False:
         plt.title('Training and Validation Loss', fontsize=16, family='serif')
     else:
         plt.title(title, fontsize=16, family='serif')
@@ -46,6 +46,10 @@ def plot_training_pytorch(history, window_size=10, plot_original=False, save=Fal
     # Set y-axis to logarithmic scale if specified
     if log_y:
         ax.set_yscale('log')
+
+    # Set x-axis to logarithmic scale if specified
+    if log_x:
+        ax.set_xscale('log')
 
     # Set axis tick parameters
     ax.tick_params(axis='both', which='major', labelsize=14)
