@@ -1,6 +1,6 @@
 # Torch_LS_Surr
 
-Torch_LS_Surr is a PyTorch-based framework for training surrogate models for dense, low-rank, ill-conditioned linear systems encountered in high-order mesh-free methods. This repository supports training three types of models: MLP, PINN, and ResMLP. Here, "LS" stands for linear system and "Surr" stands for surrogate.
+Torch_LS_Surr is a PyTorch-based framework for training surrogate models for dense, low-rank, ill-conditioned linear systems encountered in high-order mesh-free methods. This repository supports training two types of models: MLP and Residual MLP. Here, "LS" stands for linear system and "Surr" stands for surrogate. The user can easily implement new architectures or custom loss functions and inherit the existing training loop.
 
 ## Table of Contents
 
@@ -12,7 +12,7 @@ Torch_LS_Surr is a PyTorch-based framework for training surrogate models for den
 
 ## Features
 
-- **Multiple Model Types:** Train surrogate models using MLP, PINN, or ResMLP.
+- **Multiple Model Types:** Train surrogate models using MLP or ResMLP.
 - **Distributed Training:** Leverages PyTorch Distributed Data Parallel for efficient multi-GPU training.
 - **Custom Architecture:** Define the model architecture by specifying the number of layers and neurons in each layer.
 - **Flexible Parameter Settings:** Adjust high-level training parameters (e.g., number of epochs, batch size) via the `run_model` function in `main.py` or modify low-level settings directly in the `models` folder.
