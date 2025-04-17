@@ -1,6 +1,6 @@
 # train-ls
 
-train-ls is a PyTorch-based framework for training surrogate models for dense, low-rank, ill-conditioned linear systems encountered in high-order mesh-free methods. This repository supports training two types of models: MLP and Residual MLP. Here, "LS" stands for linear system and "Surr" stands for surrogate. The user can easily implement new architectures or custom loss functions and inherit the existing training loop.
+train-ls is a PyTorch-based framework for training surrogate models for dense, low-rank, ill-conditioned linear systems encountered in high-order mesh-free methods. This repository supports training two types of models: MLP and Residual MLP. Here, "LS" stands for linear system. The user can easily implement new architectures or custom loss functions and inherit the existing training loop.
 
 ## Table of Contents
 
